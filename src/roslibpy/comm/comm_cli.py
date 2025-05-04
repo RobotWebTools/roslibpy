@@ -271,7 +271,7 @@ class CliRosBridgeClientFactory(EventEmitterMixin):
     factor = 2.7182818284590451  # (math.e)
 
     def __init__(self, url, *args, **kwargs):
-        super(CliRosBridgeClientFactory, self).__init__(*args, **kwargs)
+        super(CliRosBridgeClientFactory, self).__init__()
         self._manager = CliEventLoopManager()
         self.manual_disconnect = False
         self.proto = None

@@ -21,6 +21,21 @@ Unreleased
 
 **Removed**
 
+1.8.1
+----------
+
+**Added**
+
+**Changed**
+
+**Fixed**
+
+* Fixed ROS connection issue on IronPython.
+
+**Deprecated**
+
+**Removed**
+
 1.8.0
 ----------
 

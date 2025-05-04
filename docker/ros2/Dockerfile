@@ -1,14 +1,15 @@
-FROM ros:iron
-LABEL maintainer "Gonzalo Casas <casas@arch.ethz.ch>"
+FROM ros:jazzy
+LABEL maintainer="Gonzalo Casas <casas@arch.ethz.ch>"
 
 SHELL ["/bin/bash","-c"]
 
 # Install rosbridge
 RUN apt-get update && apt-get install -y \
-    ros-iron-rosbridge-suite \
-    # ros-iron-tf2-web-republisher \
-    # ros-iron-ros-tutorials \
-    # ros-iron-actionlib-tutorials \
+    ros-${ROS_DISTRO}-rosbridge-suite \
+    # ros-${ROS_DISTRO}-tf2-web-republisher \
+    # ros-${ROS_DISTRO}-ros-tutorials \
+    ros-${ROS_DISTRO}-examples-rclpy-minimal-action-server \
+    ros-${ROS_DISTRO}-example-interfaces \
     --no-install-recommends \
     # Clear apt-cache to reduce image size
     && rm -rf /var/lib/apt/lists/*
