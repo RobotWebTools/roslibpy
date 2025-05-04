@@ -1,4 +1,4 @@
-name: build
+name: Test package against ROS 2
 
 on:
   push:
@@ -11,7 +11,7 @@ on:
       - main
 
 jobs:
-  build-ros2:
+  test-ros2:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -19,6 +19,7 @@ jobs:
           "ubuntu-py39",
           "ubuntu-py310",
           "ubuntu-py311",
+          "ubuntu-py312",
         ]
         include:
           - name: "ubuntu-py39"
@@ -30,10 +31,13 @@ jobs:
           - name: "ubuntu-py311"
             os: ubuntu-latest
             python-version: "3.11"
+          - name: "ubuntu-py312"
+            os: ubuntu-latest
+            python-version: "3.12"
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies

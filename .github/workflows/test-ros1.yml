@@ -1,4 +1,4 @@
-name: build
+name: Test against ROS 1
 
 on:
   push:
@@ -11,7 +11,7 @@ on:
       - main
 
 jobs:
-  build-ros1:
+  test-ros1:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
