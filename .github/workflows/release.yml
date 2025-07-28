@@ -10,11 +10,11 @@ jobs:
     name: publish release
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - name: Set up Python 3.8
-        uses: actions/setup-python@v4
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
         with:
-          python-version: 3.8
+          python-version: 3.12
       - name: 🔗 Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -23,11 +23,9 @@ jobs:
         run: |
           python -m pip install --no-cache-dir -r requirements-dev.txt
       - name: 💃 Build release
-        if: success() && startsWith(github.ref, 'refs/tags')
         run: |
           python setup.py clean --all sdist bdist_wheel
       - name: 📦 Publish release to PyPI
-        if: success() && startsWith(github.ref, 'refs/tags')
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@76f52bc884231f62b9a034ebfe128415bbaabdfc # v1.12.4
         with:
             password: ${{ secrets.pypi_password }}
