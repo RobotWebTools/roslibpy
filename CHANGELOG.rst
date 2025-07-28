@@ -11,7 +11,7 @@ Unreleased
 ----------
 
 **Added**
-* Added ROS 2 action client object with limited capabilities ``roslibpy.ActionClient``.
+* Added ROS 2 action client support.
 
 **Changed**
 
