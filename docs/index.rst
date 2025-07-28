@@ -44,7 +44,7 @@ local ROS environment, allowing usage from platforms other than Linux.
 
 The API of **roslibpy** is modeled to closely match that of `roslibjs <http://wiki.ros.org/roslibjs>`_.
 
-ROS1 is fully supported. ROS2 support is still in progress.
+ROS 1 is fully supported. ROS 2 support is still in progress.
 
 ========
 Contents

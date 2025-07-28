@@ -3,6 +3,7 @@ from __future__ import print_function
 import json
 import logging
 import time
+from enum import Enum
 
 # Python 2/3 compatibility import list
 try:
@@ -20,6 +21,9 @@ __all__ = [
     "Service",
     "ServiceRequest",
     "ServiceResponse",
+    "ActionGoal",
+    "ActionFeedback",
+    "ActionResult",
     "Time",
     "Topic",
 ]
@@ -50,7 +54,7 @@ class Message(UserDict):
 class Header(UserDict):
     """Represents a message header of the ROS type std_msgs/Header.
 
-    This header is only compatible with ROS1. For ROS2 headers, use :class:`roslibpy.ros2.Header`.
+    This header is only compatible with ROS 1. For ROS 2 headers, use :class:`roslibpy.ros2.Header`.
 
     """
 
@@ -124,6 +128,47 @@ class ServiceRequest(UserDict):
 
 class ServiceResponse(UserDict):
     """Response returned from a service call."""
+
+    def __init__(self, values=None):
+        self.data = {}
+        if values is not None:
+            self.update(values)
+
+
+class ActionResult(UserDict):
+    """Result returned from a action call."""
+
+    def __init__(self, values=None):
+        self.data = {}
+        if values is not None:
+            self.update(values)
+
+
+class ActionFeedback(UserDict):
+    """Feedback returned from a action call."""
+
+    def __init__(self, values=None):
+        self.data = {}
+        if values is not None:
+            self.update(values)
+
+
+class ActionGoalStatus(Enum):
+    """ ROS2 Action Goal statuses.
+        Reference: https://docs.ros2.org/latest/api/action_msgs/msg/GoalStatus.html
+    """
+
+    UNKNOWN = 0
+    ACCEPTED = 1
+    EXECUTING = 2
+    CANCELING = 3
+    SUCCEEDED = 4
+    CANCELED = 5
+    ABORTED = 6
+
+
+class ActionGoal(UserDict):
+    """Action Goal for an action call."""
 
     def __init__(self, values=None):
         self.data = {}
@@ -489,6 +534,77 @@ class Service(object):
             call["id"] = request["id"]
 
         self.ros.send_on_ready(call)
+
+
+class ActionClient(object):
+    """Action Client of ROS 2 actions.
+
+    Args:
+        ros (:class:`.Ros`): Instance of the ROS connection.
+        name (:obj:`str`): Service name, e.g. ``/fibonacci``.
+        action_type (:obj:`str`): Action type, e.g. ``rospy_tutorials/fibonacci``.
+    """
+
+    def __init__(self, ros, name, action_type, reconnect_on_close=True):
+        self.ros = ros
+        self.name = name
+        self.action_type = action_type
+
+        self._service_callback = None
+        self._is_advertised = False
+        self.reconnect_on_close = reconnect_on_close
+
+    def send_goal(self, goal, resultback, feedback, errback):
+        """ Start a service call.
+
+            Note:
+            The action client is non-blocking.
+
+            Args:
+            request (:class:`.ServiceRequest`): Service request.
+            resultback: Callback invoked on receiving action result.
+            feedback: Callback invoked on receiving action feedback.
+            errback: Callback invoked on error.
+
+            Returns:
+            object: goal ID if successfull, otherwise ``None``.
+        """
+        if self._is_advertised:
+            return
+
+        action_goal_id = "send_action_goal:%s:%d" % (self.name, self.ros.id_counter)
+
+        message = Message(
+            {
+                "op": "send_action_goal",
+                "id": action_goal_id,
+                "action": self.name,
+                "action_type": self.action_type,
+                "args": dict(goal),
+                "feedback": True,
+            }
+        )
+
+        self.ros.call_async_action(message,  resultback, feedback, errback)
+        return action_goal_id
+
+    def cancel_goal(self, goal_id):
+        """ Cancel an ongoing action.
+            NOTE: Async cancelation is not yet supported on rosbridge (rosbridge_suite issue #909)
+
+            Args:
+            goal_id: Goal ID returned from "send_goal()"
+        """
+        message = Message(
+            {
+                "op": "cancel_action_goal",
+                "id": goal_id,
+                "action": self.name,
+            }
+        )
+        self.ros.send_on_ready(message)
+        # Remove message_id from RosBridgeProtocol._pending_action_requests in comms.py?
+        # Not needed since an action result is returned upon cancelation.
 
 
 class Param(object):

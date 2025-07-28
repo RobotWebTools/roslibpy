@@ -41,13 +41,13 @@ as an argument to their constructors.
 Main ROS concepts
 =================
 
-ROS1 vs ROS2
+ROS 1 vs ROS 2
 ------------
 
-This library has been tested to work with ROS1. ROS2 should work, but it is still
+This library has been tested to work with ROS 1. ROS 2 should work, but it is still
 in the works.
 
-One area in which ROS1 and ROS2 differ is in the header interface. To use ROS2, use
+One area in which ROS 1 and ROS 2 differ is in the header interface. To use ROS 2, use
 the header defined in the `roslibpy.ros2` module.
 
 .. autoclass:: roslibpy.ros2.Header
@@ -82,6 +82,20 @@ model via :class:`Services <Service>`.
 .. autoclass:: ServiceResponse
    :members:
 
+Actions
+--------
+
+An Action client for ROS 2 Actions can be used by managing goal/feedback/result
+messages via :class:`ActionClient <ActionClient>`.
+
+.. autoclass:: ActionClient
+   :members:
+.. autoclass:: ActionGoal
+   :members:
+.. autoclass:: ActionFeedback
+   :members:
+.. autoclass:: ActionResult
+   :members:
 
 Parameter server
 ----------------
@@ -114,6 +128,11 @@ from .__version__ import (
     __version__,
 )
 from .core import (
+    ActionClient,
+    ActionFeedback,
+    ActionGoal,
+    ActionGoalStatus,
+    ActionResult,
     Header,
     Message,
     Param,
@@ -140,6 +159,11 @@ __all__ = [
     "Service",
     "ServiceRequest",
     "ServiceResponse",
+    "ActionClient",
+    "ActionGoal",
+    "ActionGoalStatus",
+    "ActionFeedback",
+    "ActionResult",
     "Time",
     "Topic",
     "set_rosapi_timeout",

@@ -11,6 +11,7 @@ Unreleased
 ----------
 
 **Added**
+* Added ROS 2 action client support.
 
 **Changed**
 
@@ -55,7 +56,7 @@ Unreleased
 
 **Added**
 
-* Added a ROS2-compatible header class in ``roslibpy.ros2.Header``.
+* Added a ROS 2 compatible header class in ``roslibpy.ros2.Header``.
 
 **Changed**
 

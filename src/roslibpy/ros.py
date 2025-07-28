@@ -273,6 +273,24 @@ class Ros(object):
 
         self.factory.on_ready(_send_internal)
 
+    def call_async_action(self, message, resultback, feedback, errback):
+        """Send a action request to ROS once the connection is established.
+
+        If a connection to ROS is already available, the request is sent immediately.
+
+        Args:
+            message (:class:`.Message`): ROS Bridge Message containing the request.
+            resultback: Callback invoked on successful execution.
+            feedback: Callback invoked on receiving action feedback.
+            errback: Callback invoked on error.
+        """
+
+        def _send_internal(proto):
+            proto.send_ros_action_goal(message, resultback, feedback, errback)
+            return proto
+
+        self.factory.on_ready(_send_internal)
+
     def set_status_level(self, level, identifier):
         level_message = Message({"op": "set_level", "level": level, "id": identifier})
 
