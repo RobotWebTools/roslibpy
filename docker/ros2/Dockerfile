@@ -8,7 +8,8 @@ RUN apt-get update && apt-get install -y \
     ros-${ROS_DISTRO}-rosbridge-suite \
     # ros-${ROS_DISTRO}-tf2-web-republisher \
     # ros-${ROS_DISTRO}-ros-tutorials \
-    # ros-${ROS_DISTRO}-actionlib-tutorials \
+    ros-${ROS_DISTRO}-examples-rclpy-minimal-action-server \
+    ros-${ROS_DISTRO}-example-interfaces \
     --no-install-recommends \
     # Clear apt-cache to reduce image size
     && rm -rf /var/lib/apt/lists/*

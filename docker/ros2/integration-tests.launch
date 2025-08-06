@@ -1,4 +1,7 @@
 <launch>
-    <include file="$(find-pkg-share rosbridge_server)/launch/rosbridge_websocket_launch.xml" />
-    <!-- <node pkg="tf2_web_republisher" type="tf2_web_republisher" name="tf2_web_republisher"></node> -->
+  <include file="$(find-pkg-share rosbridge_server)/launch/rosbridge_websocket_launch.xml">
+    <let name="send_action_goals_in_new_thread" value="true"/>
+  </include>
+  <!-- <node pkg="tf2_web_republisher" type="tf2_web_republisher" name="tf2_web_republisher"></node> -->
+  <node pkg="examples_rclpy_minimal_action_server" exec="server"/>
 </launch>
