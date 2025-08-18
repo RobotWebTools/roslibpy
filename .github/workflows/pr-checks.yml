@@ -10,7 +10,7 @@ jobs:
     name: Check Actions
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Changelog check
         uses: Zomzog/changelog-checker@09cfe9ad3618dcbfdba261adce0c41904cabb8c4 # v1.3.0
         with:
