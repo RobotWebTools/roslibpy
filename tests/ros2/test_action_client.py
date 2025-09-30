@@ -1,8 +1,9 @@
 """Tests for ROS2 ActionClient message handling."""
+
 from unittest.mock import Mock
 
 from roslibpy.comm.comm import RosBridgeProtocol
-from roslibpy.core import ActionResult, ActionGoalStatus
+from roslibpy.core import ActionGoalStatus, ActionResult
 
 
 def test_action_result_with_status_at_top_level():
@@ -24,10 +25,8 @@ def test_action_result_with_status_at_top_level():
         "action": "/test_action",
         "id": request_id,
         "status": 4,  # SUCCEEDED
-        "values": {
-            "result": {"success": True, "message": "Action completed"}
-        },
-        "result": True
+        "values": {"result": {"success": True, "message": "Action completed"}},
+        "result": True,
     }
 
     protocol._handle_action_result(message)
@@ -62,9 +61,9 @@ def test_action_result_with_status_in_values():
         "id": request_id,
         "values": {
             "status": 4,  # SUCCEEDED - status is here instead
-            "result": {"success": True, "message": "Action completed"}
+            "result": {"success": True, "message": "Action completed"},
         },
-        "result": True
+        "result": True,
     }
 
     # This should not raise KeyError
@@ -94,10 +93,8 @@ def test_action_result_failure_with_status_at_top_level():
         "action": "/test_action",
         "id": request_id,
         "status": 6,  # ABORTED
-        "values": {
-            "result": {"success": False, "message": "Action failed"}
-        },
-        "result": False
+        "values": {"result": {"success": False, "message": "Action failed"}},
+        "result": False,
     }
 
     protocol._handle_action_result(message)
@@ -130,10 +127,8 @@ def test_action_result_without_status_field():
         "op": "action_result",
         "action": "/test_action",
         "id": request_id,
-        "values": {
-            "result": {"success": True}
-        },
-        "result": True
+        "values": {"result": {"success": True}},
+        "result": True,
     }
 
     # Should not raise KeyError, should use default status

@@ -138,12 +138,12 @@ class RosBridgeProtocol(object):
     def _handle_action_request(self, message):
         if "action" not in message:
             raise ValueError("Expected action name missing in action request")
-        raise RosBridgeException('Action server capabilities not yet implemented')
+        raise RosBridgeException("Action server capabilities not yet implemented")
 
     def _handle_action_cancel(self, message):
         if "action" not in message:
             raise ValueError("Expected action name missing in action request")
-        raise RosBridgeException('Action server capabilities not yet implemented')
+        raise RosBridgeException("Action server capabilities not yet implemented")
 
     def _handle_action_feedback(self, message):
         if "action" not in message:
@@ -160,7 +160,7 @@ class RosBridgeProtocol(object):
         if not action_handlers:
             raise RosBridgeException('No handler registered for action request ID: "%s"' % request_id)
 
-        resultback, _ , errback = action_handlers
+        resultback, _, errback = action_handlers
         del self._pending_action_requests[request_id]
 
         # Handle different message formats for status field
