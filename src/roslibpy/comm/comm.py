@@ -163,9 +163,18 @@ class RosBridgeProtocol(object):
         resultback, _ , errback = action_handlers
         del self._pending_action_requests[request_id]
 
-        LOGGER.debug("Received Action result with status: %s", message["status"])
+        # Handle different message formats for status field
+        # ROS2 rosbridge may send status at top level or inside values
+        status = message.get("status")
+        if status is None and "values" in message:
+            status = message["values"].get("status")
+        if status is None:
+            # Default to UNKNOWN if status is not found
+            status = ActionGoalStatus.UNKNOWN.value
 
-        results = {"status": ActionGoalStatus(message["status"]).name, "values": message["values"]}
+        LOGGER.debug("Received Action result with status: %s", status)
+
+        results = {"status": ActionGoalStatus(status).name, "values": message.get("values", {})}
 
         if "result" in message and message["result"] is False:
             if errback:
