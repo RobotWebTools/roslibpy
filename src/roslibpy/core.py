@@ -542,7 +542,7 @@ class ActionClient(object):
     Args:
         ros (:class:`.Ros`): Instance of the ROS connection.
         name (:obj:`str`): Service name, e.g. ``/fibonacci``.
-        action_type (:obj:`str`): Action type, e.g. ``rospy_tutorials/fibonacci``.
+        action_type (:obj:`str`): Action type, e.g. ``example_interfaces/action/Fibonacci``.
     """
 
     def __init__(self, ros, name, action_type, reconnect_on_close=True):
@@ -555,18 +555,17 @@ class ActionClient(object):
         self.reconnect_on_close = reconnect_on_close
 
     def send_goal(self, goal, resultback, feedback, errback):
-        """ Start a service call.
+        """Start a call to an action.
 
-            Note:
-            The action client is non-blocking.
+        Note: The action client is non-blocking.
 
-            Args:
+        Args:
             request (:class:`.ServiceRequest`): Service request.
             resultback: Callback invoked on receiving action result.
             feedback: Callback invoked on receiving action feedback.
             errback: Callback invoked on error.
 
-            Returns:
+        Returns:
             object: goal ID if successfull, otherwise ``None``.
         """
         if self._is_advertised:
@@ -589,11 +588,12 @@ class ActionClient(object):
         return action_goal_id
 
     def cancel_goal(self, goal_id):
-        """ Cancel an ongoing action.
-            NOTE: Async cancelation is not yet supported on rosbridge (rosbridge_suite issue #909)
+        """Cancel an ongoing action.
+        
+        NOTE: Async cancelation is not yet supported on rosbridge (rosbridge_suite issue #909)
 
-            Args:
-            goal_id: Goal ID returned from "send_goal()"
+        Args:
+            goal_id: Goal ID returned from ``send_goal()``
         """
         message = Message(
             {
