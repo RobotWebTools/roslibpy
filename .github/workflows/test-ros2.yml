@@ -50,7 +50,7 @@ jobs:
       - name: Set up docker containers
         run: |
           docker build -t gramaziokohler/rosbridge:integration_tests_ros2 ./docker/ros2
-          docker run -d -p 9090:9090 --name rosbridge gramaziokohler/rosbridge:integration_tests_ros2 /bin/bash -c "ros2 launch /integration-tests.launch"
+          docker run -d -p 9090:9090 --name rosbridge gramaziokohler/rosbridge:integration_tests_ros2 /bin/bash -c "ros2 launch /integration-tests-launch.py"
           docker ps -a
       - name: Run linter
         run: |
