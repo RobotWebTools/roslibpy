@@ -11,7 +11,7 @@ def result_callback(msg):
     print("Action result:", msg)
 
 def feedback_callback(msg):
-    print(f"Action feedback: {msg['partial_sequence']}")
+    print(f"Action feedback: {msg['sequence']}")
 
 def fail_callback(msg):
     print(f"Action failed: {msg}")
@@ -23,7 +23,8 @@ def test_action_success(action_client):
     global result
     result = None
     
-    action_client.send_goal(roslibpy.ActionGoal({"order": 8}),
+    goal = roslibpy.ActionGoal({"order": 8})
+    action_client.send_goal(goal,
                                 result_callback,
                                 feedback_callback,
                                 fail_callback)
@@ -44,7 +45,8 @@ def test_action_cancel(action_client):
     global result
     result = None
 
-    goal_id = action_client.send_goal(roslibpy.ActionGoal({"order": 8}),
+    goal = roslibpy.ActionGoal({"order": 8})
+    goal_id = action_client.send_goal(goal,
                                     result_callback,
                                     feedback_callback,
                                     fail_callback)
@@ -66,7 +68,7 @@ if __name__ == "__main__":
 
     action_client = roslibpy.ActionClient(client,
                                         "/fibonacci",
-                                      "custom_action_interfaces/action/Fibonacci")
+                                      "example_interfaces/action/Fibonacci")
     print("\n** Starting action client test **")
     test_action_success(action_client)
 
