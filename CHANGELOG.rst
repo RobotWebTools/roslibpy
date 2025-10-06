@@ -16,6 +16,7 @@ Unreleased
 **Changed**
 
 **Fixed**
+* Fixed KeyError in ROS2 ActionClient when receiving action results with different message formats from rosbridge.
 
 **Deprecated**
 
