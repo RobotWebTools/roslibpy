@@ -560,7 +560,7 @@ class ActionClient(object):
         Note: The action client is non-blocking.
 
         Args:
-            request (:class:`.ServiceRequest`): Service request.
+            goal (:class:`.ActionGoal`): Action goal.
             resultback: Callback invoked on receiving action result.
             feedback: Callback invoked on receiving action feedback.
             errback: Callback invoked on error.

@@ -42,7 +42,7 @@ Main ROS concepts
 =================
 
 ROS 1 vs ROS 2
-------------
+--------------
 
 This library has been tested to work with ROS 1. ROS 2 should work, but it is still
 in the works.
