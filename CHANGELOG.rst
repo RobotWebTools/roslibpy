@@ -11,11 +11,15 @@ Unreleased
 ----------
 
 **Added**
+
 * Added ROS 2 action client support.
+* Added ``wait_goal`` method to ``ActionClient`` to block until a goal reaches a terminal state.
+* Moved ``actionlib`` module to ``roslibpy.ros1`` namespace.
 
 **Changed**
 
 **Fixed**
+
 * Fixed KeyError in ROS2 ActionClient when receiving action results with different message formats from rosbridge.
 
 **Deprecated**
