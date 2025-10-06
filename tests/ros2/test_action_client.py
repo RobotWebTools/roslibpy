@@ -34,7 +34,7 @@ def test_action_result_with_status_at_top_level():
     assert result_callback.called
     result = result_callback.call_args[0][0]
     assert isinstance(result, ActionResult)
-    assert result["status"] == ActionGoalStatus.SUCCEEDED.name
+    assert result["status"] == ActionGoalStatus.SUCCEEDED
     assert result["values"] == message["values"]
 
 
@@ -72,7 +72,7 @@ def test_action_result_with_status_in_values():
     assert result_callback.called
     result = result_callback.call_args[0][0]
     assert isinstance(result, ActionResult)
-    assert result["status"] == ActionGoalStatus.SUCCEEDED.name
+    assert result["status"] == ActionGoalStatus.SUCCEEDED
 
 
 def test_action_result_failure_with_status_at_top_level():
@@ -101,7 +101,7 @@ def test_action_result_failure_with_status_at_top_level():
 
     assert error_callback.called
     result = error_callback.call_args[0][0]
-    assert result["status"] == ActionGoalStatus.ABORTED.name
+    assert result["status"] == ActionGoalStatus.ABORTED
     assert result["values"] == message["values"]
 
 
