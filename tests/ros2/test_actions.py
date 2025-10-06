@@ -2,8 +2,8 @@ from __future__ import print_function
 
 import time
 
-from roslibpy import Ros
-from roslibpy import ActionClient, ActionGoal, ActionGoalStatus
+from roslibpy import ActionClient, ActionGoal, ActionGoalStatus, Ros
+
 
 def test_fibonacci():
     ros = Ros("127.0.0.1", 9090)
@@ -31,11 +31,12 @@ def test_fibonacci():
     goal_id = action.send_goal(goal, on_result, on_feedback, on_error)
     action.wait_goal(goal_id)
     time.sleep(0.2)
-    
+
     assert results["result"]["values"]["sequence"] == [0, 1, 1, 2, 3]
     assert results["result"]["status"] == ActionGoalStatus.SUCCEEDED
 
     ros.close()
+
 
 def test_cancel():
     ros = Ros("127.0.0.1", 9090)
@@ -69,6 +70,7 @@ def test_cancel():
     assert results["result"]["status"] == ActionGoalStatus.CANCELED
 
     ros.close()
+
 
 if __name__ == "__main__":
     test_cancel()

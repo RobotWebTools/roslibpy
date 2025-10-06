@@ -2,8 +2,8 @@ from __future__ import print_function
 
 import json
 import logging
-import time
 import threading
+import time
 from enum import Enum
 
 # Python 2/3 compatibility import list
@@ -604,7 +604,7 @@ class ActionClient(object):
 
     def cancel_goal(self, goal_id):
         """Cancel an ongoing action.
-        
+
         NOTE: Async cancelation is not yet supported on rosbridge (rosbridge_suite issue #909)
 
         Args:
@@ -640,6 +640,7 @@ class ActionClient(object):
             raise RosTimeoutError("Goal failed to receive result")
 
         self.wait_results.pop(goal_id, None)
+
 
 class Param(object):
     """A ROS parameter.
