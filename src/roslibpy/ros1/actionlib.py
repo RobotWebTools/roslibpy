@@ -28,9 +28,9 @@ import random
 import threading
 import time
 
-from . import Message, Topic
-from .core import RosTimeoutError
-from .event_emitter import EventEmitterMixin
+from roslibpy import Message, Topic
+from roslibpy.core import RosTimeoutError
+from roslibpy.event_emitter import EventEmitterMixin
 
 __all__ = ["Goal", "GoalStatus", "ActionClient", "SimpleActionServer"]
 
