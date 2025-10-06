@@ -1,6 +1,6 @@
 """
-Actionlib
-=========
+Actionlib (ROS 1)
+=================
 
 Another way to interact with ROS is through the **actionlib** stack. Actions in
 ROS allow to execute preemptable tasks, i.e. tasks that can be interrupted by the client.

@@ -174,7 +174,7 @@ class RosBridgeProtocol(object):
 
         LOGGER.debug("Received Action result with status: %s", status)
 
-        results = {"status": ActionGoalStatus(status).name, "values": message.get("values", {})}
+        results = {"status": ActionGoalStatus(status), "values": message.get("values", {})}
 
         if "result" in message and message["result"] is False:
             if errback:

@@ -82,8 +82,8 @@ model via :class:`Services <Service>`.
 .. autoclass:: ServiceResponse
    :members:
 
-Actions
---------
+Actions (ROS 2)
+---------------
 
 An Action client for ROS 2 Actions can be used by managing goal/feedback/result
 messages via :class:`ActionClient <ActionClient>`.

@@ -8,6 +8,6 @@ API Reference
     from roslibpy import *
 
 .. automodule:: roslibpy
-.. automodule:: roslibpy.actionlib
 .. automodule:: roslibpy.tf
+.. automodule:: roslibpy.ros1.actionlib
 .. automodule:: roslibpy.ros2

@@ -3,6 +3,7 @@ from __future__ import print_function
 import json
 import logging
 import time
+import threading
 from enum import Enum
 
 # Python 2/3 compatibility import list
@@ -553,6 +554,7 @@ class ActionClient(object):
         self._service_callback = None
         self._is_advertised = False
         self.reconnect_on_close = reconnect_on_close
+        self.wait_results = {}
 
     def send_goal(self, goal, resultback, feedback, errback):
         """Start a call to an action.
@@ -572,6 +574,7 @@ class ActionClient(object):
             return
 
         action_goal_id = "send_action_goal:%s:%d" % (self.name, self.ros.id_counter)
+        self.wait_results[action_goal_id] = threading.Event()
 
         message = Message(
             {
@@ -584,7 +587,19 @@ class ActionClient(object):
             }
         )
 
-        self.ros.call_async_action(message,  resultback, feedback, errback)
+        def _internal_resultback(result):
+            wait_result_event = self.wait_results.get(action_goal_id)
+            if wait_result_event is not None:
+                wait_result_event.set()
+            resultback(result)
+
+        def _internal_errback(err):
+            wait_result_event = self.wait_results.get(action_goal_id)
+            if wait_result_event is not None:
+                wait_result_event.set()
+            errback(err)
+
+        self.ros.call_async_action(message,  _internal_resultback, feedback, _internal_errback)
         return action_goal_id
 
     def cancel_goal(self, goal_id):
@@ -603,9 +618,28 @@ class ActionClient(object):
             }
         )
         self.ros.send_on_ready(message)
+
         # Remove message_id from RosBridgeProtocol._pending_action_requests in comms.py?
         # Not needed since an action result is returned upon cancelation.
 
+    def wait_goal(self, goal_id, timeout=None):
+        """Block until the result is available.
+
+        If ``timeout`` is ``None``, it will wait indefinitely.
+
+        Args:
+            goal_id: Goal ID returned from ``send_goal()``
+            timeout (:obj:`int`): Timeout to wait for the result expressed in seconds.
+        """
+
+        wait_result_event = self.wait_results.get(goal_id)
+        if wait_result_event is None:
+            raise ValueError("Unknown goal ID")
+
+        if not wait_result_event.wait(timeout):
+            raise RosTimeoutError("Goal failed to receive result")
+
+        self.wait_results.pop(goal_id, None)
 
 class Param(object):
     """A ROS parameter.
