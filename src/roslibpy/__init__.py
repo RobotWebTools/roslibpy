@@ -42,7 +42,7 @@ Main ROS concepts
 =================
 
 ROS 1 vs ROS 2
-------------
+--------------
 
 This library has been tested to work with ROS 1. ROS 2 should work, but it is still
 in the works.
@@ -82,19 +82,21 @@ model via :class:`Services <Service>`.
 .. autoclass:: ServiceResponse
    :members:
 
-Actions
---------
+Actions (ROS 2)
+---------------
 
 An Action client for ROS 2 Actions can be used by managing goal/feedback/result
 messages via :class:`ActionClient <ActionClient>`.
 
 .. autoclass:: ActionClient
    :members:
-.. autoclass:: ActionGoal
+.. autoclass:: Goal
    :members:
-.. autoclass:: ActionFeedback
+.. autoclass:: GoalStatus
    :members:
-.. autoclass:: ActionResult
+.. autoclass:: Feedback
+   :members:
+.. autoclass:: Result
    :members:
 
 Parameter server
@@ -129,13 +131,13 @@ from .__version__ import (
 )
 from .core import (
     ActionClient,
-    ActionFeedback,
-    ActionGoal,
-    ActionGoalStatus,
-    ActionResult,
+    Feedback,
+    Goal,
+    GoalStatus,
     Header,
     Message,
     Param,
+    Result,
     Service,
     ServiceRequest,
     ServiceResponse,
@@ -153,19 +155,19 @@ __all__ = [
     "__title__",
     "__url__",
     "__version__",
+    "ActionClient",
+    "Feedback",
+    "Goal",
+    "GoalStatus",
     "Header",
     "Message",
     "Param",
+    "Result",
+    "Ros",
     "Service",
     "ServiceRequest",
     "ServiceResponse",
-    "ActionClient",
-    "ActionGoal",
-    "ActionGoalStatus",
-    "ActionFeedback",
-    "ActionResult",
+    "set_rosapi_timeout",
     "Time",
     "Topic",
-    "set_rosapi_timeout",
-    "Ros",
 ]

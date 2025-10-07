@@ -2,6 +2,7 @@ from __future__ import print_function
 
 import json
 import logging
+import threading
 import time
 from enum import Enum
 
@@ -21,9 +22,10 @@ __all__ = [
     "Service",
     "ServiceRequest",
     "ServiceResponse",
-    "ActionGoal",
-    "ActionFeedback",
-    "ActionResult",
+    "Goal",
+    "GoalStatus",
+    "Feedback",
+    "Result",
     "Time",
     "Topic",
 ]
@@ -135,8 +137,8 @@ class ServiceResponse(UserDict):
             self.update(values)
 
 
-class ActionResult(UserDict):
-    """Result returned from a action call."""
+class Result(UserDict):
+    """Result returned from an action call."""
 
     def __init__(self, values=None):
         self.data = {}
@@ -144,8 +146,8 @@ class ActionResult(UserDict):
             self.update(values)
 
 
-class ActionFeedback(UserDict):
-    """Feedback returned from a action call."""
+class Feedback(UserDict):
+    """Feedback returned from an action call."""
 
     def __init__(self, values=None):
         self.data = {}
@@ -153,8 +155,8 @@ class ActionFeedback(UserDict):
             self.update(values)
 
 
-class ActionGoalStatus(Enum):
-    """ ROS2 Action Goal statuses.
+class GoalStatus(Enum):
+    """ ROS 2 goal statuses.
         Reference: https://docs.ros2.org/latest/api/action_msgs/msg/GoalStatus.html
     """
 
@@ -167,8 +169,8 @@ class ActionGoalStatus(Enum):
     ABORTED = 6
 
 
-class ActionGoal(UserDict):
-    """Action Goal for an action call."""
+class Goal(UserDict):
+    """Goal for an action call."""
 
     def __init__(self, values=None):
         self.data = {}
@@ -542,7 +544,7 @@ class ActionClient(object):
     Args:
         ros (:class:`.Ros`): Instance of the ROS connection.
         name (:obj:`str`): Service name, e.g. ``/fibonacci``.
-        action_type (:obj:`str`): Action type, e.g. ``rospy_tutorials/fibonacci``.
+        action_type (:obj:`str`): Action type, e.g. ``example_interfaces/action/Fibonacci``.
     """
 
     def __init__(self, ros, name, action_type, reconnect_on_close=True):
@@ -553,26 +555,27 @@ class ActionClient(object):
         self._service_callback = None
         self._is_advertised = False
         self.reconnect_on_close = reconnect_on_close
+        self.wait_results = {}
 
     def send_goal(self, goal, resultback, feedback, errback):
-        """ Start a service call.
+        """Start a call to an action.
 
-            Note:
-            The action client is non-blocking.
+        Note: The action client is non-blocking.
 
-            Args:
-            request (:class:`.ServiceRequest`): Service request.
+        Args:
+            goal (:class:`.Goal`): Action goal.
             resultback: Callback invoked on receiving action result.
             feedback: Callback invoked on receiving action feedback.
             errback: Callback invoked on error.
 
-            Returns:
+        Returns:
             object: goal ID if successfull, otherwise ``None``.
         """
         if self._is_advertised:
             return
 
         action_goal_id = "send_action_goal:%s:%d" % (self.name, self.ros.id_counter)
+        self.wait_results[action_goal_id] = threading.Event()
 
         message = Message(
             {
@@ -585,15 +588,28 @@ class ActionClient(object):
             }
         )
 
-        self.ros.call_async_action(message,  resultback, feedback, errback)
+        def _internal_resultback(result):
+            wait_result_event = self.wait_results.get(action_goal_id)
+            if wait_result_event is not None:
+                wait_result_event.set()
+            resultback(result)
+
+        def _internal_errback(err):
+            wait_result_event = self.wait_results.get(action_goal_id)
+            if wait_result_event is not None:
+                wait_result_event.set()
+            errback(err)
+
+        self.ros.call_async_action(message,  _internal_resultback, feedback, _internal_errback)
         return action_goal_id
 
     def cancel_goal(self, goal_id):
-        """ Cancel an ongoing action.
-            NOTE: Async cancelation is not yet supported on rosbridge (rosbridge_suite issue #909)
+        """Cancel an ongoing action.
 
-            Args:
-            goal_id: Goal ID returned from "send_goal()"
+        NOTE: Async cancelation is not yet supported on rosbridge (rosbridge_suite issue #909)
+
+        Args:
+            goal_id: Goal ID returned from ``send_goal()``
         """
         message = Message(
             {
@@ -603,8 +619,28 @@ class ActionClient(object):
             }
         )
         self.ros.send_on_ready(message)
+
         # Remove message_id from RosBridgeProtocol._pending_action_requests in comms.py?
         # Not needed since an action result is returned upon cancelation.
+
+    def wait_goal(self, goal_id, timeout=None):
+        """Block until the result is available.
+
+        If ``timeout`` is ``None``, it will wait indefinitely.
+
+        Args:
+            goal_id: Goal ID returned from ``send_goal()``
+            timeout (:obj:`int`): Timeout to wait for the result expressed in seconds.
+        """
+
+        wait_result_event = self.wait_results.get(goal_id)
+        if wait_result_event is None:
+            raise ValueError("Unknown goal ID")
+
+        if not wait_result_event.wait(timeout):
+            raise RosTimeoutError("Goal failed to receive result")
+
+        self.wait_results.pop(goal_id, None)
 
 
 class Param(object):
