@@ -22,9 +22,10 @@ __all__ = [
     "Service",
     "ServiceRequest",
     "ServiceResponse",
-    "ActionGoal",
-    "ActionFeedback",
-    "ActionResult",
+    "Goal",
+    "GoalStatus",
+    "Feedback",
+    "Result",
     "Time",
     "Topic",
 ]
@@ -136,8 +137,8 @@ class ServiceResponse(UserDict):
             self.update(values)
 
 
-class ActionResult(UserDict):
-    """Result returned from a action call."""
+class Result(UserDict):
+    """Result returned from an action call."""
 
     def __init__(self, values=None):
         self.data = {}
@@ -145,8 +146,8 @@ class ActionResult(UserDict):
             self.update(values)
 
 
-class ActionFeedback(UserDict):
-    """Feedback returned from a action call."""
+class Feedback(UserDict):
+    """Feedback returned from an action call."""
 
     def __init__(self, values=None):
         self.data = {}
@@ -154,8 +155,8 @@ class ActionFeedback(UserDict):
             self.update(values)
 
 
-class ActionGoalStatus(Enum):
-    """ ROS 2 Action Goal statuses.
+class GoalStatus(Enum):
+    """ ROS 2 goal statuses.
         Reference: https://docs.ros2.org/latest/api/action_msgs/msg/GoalStatus.html
     """
 
@@ -168,8 +169,8 @@ class ActionGoalStatus(Enum):
     ABORTED = 6
 
 
-class ActionGoal(UserDict):
-    """Action Goal for an action call."""
+class Goal(UserDict):
+    """Goal for an action call."""
 
     def __init__(self, values=None):
         self.data = {}
@@ -562,7 +563,7 @@ class ActionClient(object):
         Note: The action client is non-blocking.
 
         Args:
-            goal (:class:`.ActionGoal`): Action goal.
+            goal (:class:`.Goal`): Action goal.
             resultback: Callback invoked on receiving action result.
             feedback: Callback invoked on receiving action feedback.
             errback: Callback invoked on error.

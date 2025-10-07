@@ -4,11 +4,11 @@ import json
 import logging
 
 from roslibpy.core import (
-    ActionFeedback,
-    ActionGoalStatus,
-    ActionResult,
+    Feedback,
+    GoalStatus,
     Message,
     MessageEncoder,
+    Result,
     ServiceResponse,
 )
 
@@ -151,7 +151,7 @@ class RosBridgeProtocol(object):
 
         request_id = message["id"]
         _, feedback, _ = self._pending_action_requests.get(request_id, None)
-        feedback(ActionFeedback(message["values"]))
+        feedback(Feedback(message["values"]))
 
     def _handle_action_result(self, message):
         request_id = message["id"]
@@ -170,15 +170,15 @@ class RosBridgeProtocol(object):
             status = message["values"].get("status")
         if status is None:
             # Default to UNKNOWN if status is not found
-            status = ActionGoalStatus.UNKNOWN.value
+            status = GoalStatus.UNKNOWN.value
 
         LOGGER.debug("Received Action result with status: %s", status)
 
-        results = {"status": ActionGoalStatus(status), "values": message.get("values", {})}
+        results = {"status": GoalStatus(status), "values": message.get("values", {})}
 
         if "result" in message and message["result"] is False:
             if errback:
                 errback(results)
         else:
             if resultback:
-                resultback(ActionResult(results))
+                resultback(Result(results))

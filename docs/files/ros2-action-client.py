@@ -23,7 +23,7 @@ def test_action_success(action_client):
     global result
     result = None
     
-    goal = roslibpy.ActionGoal({"order": 8})
+    goal = roslibpy.Goal({"order": 8})
     action_client.send_goal(goal,
                                 result_callback,
                                 feedback_callback,
@@ -45,7 +45,7 @@ def test_action_cancel(action_client):
     global result
     result = None
 
-    goal = roslibpy.ActionGoal({"order": 8})
+    goal = roslibpy.Goal({"order": 8})
     goal_id = action_client.send_goal(goal,
                                     result_callback,
                                     feedback_callback,
