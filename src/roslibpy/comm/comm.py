@@ -164,7 +164,7 @@ class RosBridgeProtocol(object):
         del self._pending_action_requests[request_id]
 
         # Handle different message formats for status field
-        # ROS2 rosbridge may send status at top level or inside values
+        # ROS 2 rosbridge may send status at top level or inside values
         status = message.get("status")
         if status is None and "values" in message:
             status = message["values"].get("status")

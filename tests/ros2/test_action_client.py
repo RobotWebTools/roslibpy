@@ -1,4 +1,4 @@
-"""Tests for ROS2 ActionClient message handling."""
+"""Tests for ROS 2 ActionClient message handling."""
 
 from unittest.mock import Mock
 
@@ -19,7 +19,7 @@ def test_action_result_with_status_at_top_level():
     request_id = "send_action_goal:/test_action:1"
     protocol._pending_action_requests[request_id] = (result_callback, feedback_callback, error_callback)
 
-    # ROS2 rosbridge message format with status at top level
+    # ROS 2 rosbridge message format with status at top level
     message = {
         "op": "action_result",
         "action": "/test_action",

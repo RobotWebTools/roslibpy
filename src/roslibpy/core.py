@@ -155,7 +155,7 @@ class ActionFeedback(UserDict):
 
 
 class ActionGoalStatus(Enum):
-    """ ROS2 Action Goal statuses.
+    """ ROS 2 Action Goal statuses.
         Reference: https://docs.ros2.org/latest/api/action_msgs/msg/GoalStatus.html
     """
 
