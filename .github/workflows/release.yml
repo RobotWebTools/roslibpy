@@ -11,6 +11,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Verify tag is on main branch
+        run: |
+          # Get the commit SHA that the tag points to
+          TAG_COMMIT=$(git rev-list -n 1 ${{ github.ref }})
+          echo "Tag commit: $TAG_COMMIT"
+          
+          # Check if this commit is on the main branch
+          if ! git branch -r --contains $TAG_COMMIT | grep -q 'origin/main'; then
+            echo "Error: Tag ${{ github.ref_name }} is not on the main branch"
+            echo "Releases can only be created from the main branch"
+            exit 1
+          fi
+          
+          echo "Tag is on main branch, proceeding with release"
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:

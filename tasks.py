@@ -179,11 +179,14 @@ def release(ctx, release_type):
     # Clean up local artifacts
     clean(ctx)
 
-    # Upload to pypi
-    if confirm('Everything is ready. You are about to push to git which will trigger a release to pypi.org. Are you sure? [y/N]'):
-        ctx.run('git push --tags && git push')
-    else:
-        raise Exit('You need to manually revert the tag/commits created.')
+    log.write('Release preparation complete!')
+    log.write('Next steps:')
+    log.write('  1. Push your release branch: git push origin <branch-name>')
+    log.write('  2. Push the tag: git push origin --tags')
+    log.write('  3. Create a Pull Request to main')
+    log.write('  4. Once merged, the release will be automatically published to PyPI')
+    log.write('')
+    log.write('The release workflow will verify the tag is on main before publishing.')
 
 
 @contextlib.contextmanager

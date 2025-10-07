@@ -131,13 +131,23 @@ Ready to release a new version **roslibpy**? Here's how to do it:
   * ``major``: backwards-incompatible changes.
 
 * Update the ``CHANGELOG.rst`` with all novelty!
-* Ready? Release everything in one command:
+* Create a release branch and prepare the release:
 
 ::
 
+    git checkout -b release-x.y.z
     invoke release [patch|minor|major]
 
-* Profit!
+* This will run tests, bump the version, create a git tag, and commit changes.
+* Push the release branch and tag, then create a Pull Request to ``main``:
+
+::
+
+    git push origin release-x.y.z
+    git push origin --tags
+
+* Once the PR is reviewed and merged into ``main``, the release workflow will automatically publish to PyPI.
+* The workflow verifies the tag is on the ``main`` branch before publishing, preventing accidental releases from feature branches.
 
 
 Credits
