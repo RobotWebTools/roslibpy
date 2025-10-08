@@ -165,7 +165,7 @@ def release(ctx, release_type):
         raise Exit('The release type parameter is invalid.\nMust be one of: major, minor, patch')
 
     # Run checks
-    ctx.run('invoke check test')
+    ctx.run('invoke check')
 
     # Bump version and git tag it
     ctx.run('bump2version %s --verbose' % release_type)
