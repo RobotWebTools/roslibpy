@@ -4,7 +4,7 @@
 __title__ = "roslibpy"
 __description__ = "Python ROS Bridge library."
 __url__ = "https://github.com/gramaziokohler/roslibpy"
-__version__ = "1.8.1"
+__version__ = "2.0.0"
 __author__ = "Gramazio Kohler Research"
 __author_email__ = "gramaziokohler@arch.ethz.ch"
 __license__ = "MIT license"
