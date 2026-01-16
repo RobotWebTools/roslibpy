@@ -11,7 +11,8 @@ def generate_launch_description():
                 FindPackageShare('rosbridge_server'),
                 'launch',
                 'rosbridge_websocket_launch.xml'
-            ])
+            ]),
+            launch_arguments={'delay_between_messages': '0.0'}.items(),
         ),
 
         # Start fibonacci_server.py with python3
