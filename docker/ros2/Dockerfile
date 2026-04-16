@@ -10,9 +10,12 @@ RUN apt-get update && apt-get install -y \
     # ros-${ROS_DISTRO}-ros-tutorials \
     ros-${ROS_DISTRO}-demo-nodes-py \
     ros-${ROS_DISTRO}-example-interfaces \
+    ros-${ROS_DISTRO}-rmw-cyclonedds-cpp \
     --no-install-recommends \
     # Clear apt-cache to reduce image size
     && rm -rf /var/lib/apt/lists/*
+
+ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 
 # Copy launch and example action server
 COPY ./integration-tests-launch.py /

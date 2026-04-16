@@ -29,19 +29,20 @@ class MinimalActionServer(Node):
     """Minimal action server that processes one goal at a time."""
 
     def __init__(self):
-        super().__init__('minimal_action_server')
+        super().__init__("minimal_action_server")
         self._goal_handle = None
         self._goal_lock = threading.Lock()
         self._action_server = ActionServer(
             self,
             Fibonacci,
-            'fibonacci',
+            "fibonacci",
             execute_callback=self.execute_callback,
             goal_callback=self.goal_callback,
             handle_accepted_callback=self.handle_accepted_callback,
             cancel_callback=self.cancel_callback,
-            callback_group=ReentrantCallbackGroup())
-        self.get_logger().info('Starting fibonacci action server..')
+            callback_group=ReentrantCallbackGroup(),
+        )
+        self.get_logger().info("Starting fibonacci action server..")
 
     def destroy(self):
         self._action_server.destroy()
@@ -49,14 +50,14 @@ class MinimalActionServer(Node):
 
     def goal_callback(self, goal_request):
         """Accept or reject a client request to begin an action."""
-        self.get_logger().info('Received goal request')
+        self.get_logger().info("Received goal request")
         return GoalResponse.ACCEPT
 
     def handle_accepted_callback(self, goal_handle):
         with self._goal_lock:
             # This server only allows one goal at a time
             if self._goal_handle is not None and self._goal_handle.is_active:
-                self.get_logger().info('Aborting previous goal')
+                self.get_logger().info("Aborting previous goal")
                 # Abort the existing goal
                 self._goal_handle.abort()
             self._goal_handle = goal_handle
@@ -65,34 +66,38 @@ class MinimalActionServer(Node):
 
     def cancel_callback(self, goal):
         """Accept or reject a client request to cancel an action."""
-        self.get_logger().info('Received cancel request')
+        self.get_logger().info("Received cancel request")
         return CancelResponse.ACCEPT
 
     def execute_callback(self, goal_handle):
         """Execute the goal."""
-        self.get_logger().info('Executing goal...')
+        self.get_logger().info("Executing goal...")
 
         # Append the seeds for the Fibonacci sequence
+        fib_sequence = [0, 1]
         feedback_msg = Fibonacci.Feedback()
-        feedback_msg.sequence = [0, 1]
+        feedback_msg.sequence = fib_sequence[:]
 
         # Start executing the action
         for i in range(1, goal_handle.request.order):
             # If goal is flagged as no longer active (ie. another goal was accepted),
             # then stop executing
             if not goal_handle.is_active:
-                self.get_logger().info('Goal aborted')
+                self.get_logger().info("Goal aborted")
                 return Fibonacci.Result()
 
             if goal_handle.is_cancel_requested:
                 goal_handle.canceled()
-                self.get_logger().info('Goal canceled')
+                self.get_logger().info("Goal canceled")
                 return Fibonacci.Result()
 
             # Update Fibonacci sequence
-            feedback_msg.sequence.append(feedback_msg.sequence[i] + feedback_msg.sequence[i-1])
+            fib_sequence.append(fib_sequence[i] + fib_sequence[i - 1])
+            feedback_msg.sequence = fib_sequence[:]
 
-            self.get_logger().info('Publishing feedback: {0}'.format(feedback_msg.sequence))
+            self.get_logger().info(
+                "Publishing feedback: {0}".format(feedback_msg.sequence)
+            )
 
             # Publish the feedback
             goal_handle.publish_feedback(feedback_msg)
@@ -102,16 +107,16 @@ class MinimalActionServer(Node):
 
         with self._goal_lock:
             if not goal_handle.is_active:
-                self.get_logger().info('Goal aborted')
+                self.get_logger().info("Goal aborted")
                 return Fibonacci.Result()
 
             goal_handle.succeed()
 
         # Populate result message
         result = Fibonacci.Result()
-        result.sequence = feedback_msg.sequence
+        result.sequence = fib_sequence[:]
 
-        self.get_logger().info('Returning result: {0}'.format(result.sequence))
+        self.get_logger().info("Returning result: {0}".format(result.sequence))
 
         return result
 
@@ -128,5 +133,5 @@ def main(args=None):
         pass
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

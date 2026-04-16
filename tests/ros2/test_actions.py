@@ -9,11 +9,7 @@ def test_fibonacci():
     ros = Ros("127.0.0.1", 9090)
     ros.run()
 
-    action = ActionClient(
-        ros,
-        '/fibonacci',
-        'example_interfaces/action/Fibonacci'
-    )
+    action = ActionClient(ros, "/fibonacci", "example_interfaces/action/Fibonacci")
 
     results = {}
 
@@ -42,11 +38,7 @@ def test_cancel():
     ros = Ros("127.0.0.1", 9090)
     ros.run()
 
-    action = ActionClient(
-        ros,
-        '/fibonacci',
-        'example_interfaces/action/Fibonacci'
-    )
+    action = ActionClient(ros, "/fibonacci", "example_interfaces/action/Fibonacci")
 
     results = {}
 
