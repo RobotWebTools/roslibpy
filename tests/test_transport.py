@@ -80,10 +80,15 @@ def test_asyncio_protocol_sends_text_frames():
         async def send(self, payload):
             self.payload = payload
 
-    websocket = WebSocket()
-    protocol = AsyncioRosBridgeProtocol(object(), websocket)
+    async def run_test():
+        websocket = WebSocket()
+        protocol = AsyncioRosBridgeProtocol(object(), websocket)
 
-    asyncio.run(protocol._send_async(b'{"op": "call_service"}'))
+        await protocol._send_async(b'{"op": "call_service"}')
+        protocol._stop_sender()
+        return websocket.payload
 
-    assert websocket.payload == '{"op": "call_service"}'
-    assert isinstance(websocket.payload, str)
+    payload = asyncio.run(run_test())
+
+    assert payload == '{"op": "call_service"}'
+    assert isinstance(payload, str)

@@ -94,6 +94,8 @@ class AsyncioRosBridgeProtocol(RosBridgeProtocol):
         self.ws = ws_connection
         self._manual_disconnect = False
         self._closed = False
+        self._send_queue = asyncio.Queue()
+        self._send_task = asyncio.create_task(self._send_loop())
 
     def send_message(self, payload: bytes) -> None:
         """Send an already-encoded ROS bridge message frame.
@@ -106,11 +108,22 @@ class AsyncioRosBridgeProtocol(RosBridgeProtocol):
         loop = self.factory.manager.loop
         if loop is None or loop.is_closed():
             return
-        loop.call_soon_threadsafe(self._schedule_send, payload)
+        loop.call_soon_threadsafe(self._enqueue_send, payload)
 
-    def _schedule_send(self, payload: bytes) -> None:
-        # Runs on the loop thread.
-        asyncio.create_task(self._send_async(payload))
+    def _enqueue_send(self, payload: bytes) -> None:
+        if not self._closed:
+            self._send_queue.put_nowait(payload)
+
+    async def _send_loop(self) -> None:
+        try:
+            while True:
+                payload = await self._send_queue.get()
+                try:
+                    await self._send_async(payload)
+                finally:
+                    self._send_queue.task_done()
+        except asyncio.CancelledError:
+            pass
 
     async def _send_async(self, payload: bytes) -> None:
         try:
@@ -135,13 +148,23 @@ class AsyncioRosBridgeProtocol(RosBridgeProtocol):
         loop.call_soon_threadsafe(self._schedule_close)
 
     def _schedule_close(self) -> None:
-        asyncio.create_task(self._close_async())
+        asyncio.create_task(self._close_after_pending_sends())
+
+    async def _close_after_pending_sends(self) -> None:
+        await self._send_queue.join()
+        await self._close_async()
 
     async def _close_async(self) -> None:
         try:
             await self.ws.close()
         except Exception:
             LOGGER.debug("Error during WebSocket close (often harmless if already closed).", exc_info=True)
+        finally:
+            self._stop_sender()
+
+    def _stop_sender(self) -> None:
+        if not self._send_task.done():
+            self._send_task.cancel()
 
 
 class AsyncioRosBridgeClientFactory(EventEmitterMixin):
@@ -339,6 +362,7 @@ class AsyncioRosBridgeClientFactory(EventEmitterMixin):
 
     def _on_connection_closed(self, proto: AsyncioRosBridgeProtocol) -> None:
         proto._closed = True
+        proto._stop_sender()
         with self._proto_lock:
             self._proto = None
         # Notify listeners that the connection is gone. Matches the autobahn
