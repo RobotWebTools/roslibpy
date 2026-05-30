@@ -8,6 +8,11 @@ the chosen host/port, then run for example:
 The benchmark compares connection setup, blocking rosapi service calls, and
 topic publish/subscribe round-trip latency for the ``twisted`` and ``asyncio``
 transports.
+
+The GitHub Actions benchmark runs on shared CI infrastructure, so occasional
+topic latency spikes are expected. Prefer medians and throughput for quick
+comparisons, and compare p95/max values across several runs before drawing
+conclusions about tail latency.
 """
 
 from __future__ import print_function
@@ -260,6 +265,11 @@ def run_case_subprocess(case_name, args):
 def write_markdown(path, results):
     lines = [
         "# roslibpy transport benchmark",
+        "",
+        "These numbers are sampled on shared CI infrastructure. Topic p95 and max",
+        "latencies can be noisy because of runner scheduling, Docker networking,",
+        "and rosbridge timing. Prefer medians and throughput for quick comparisons;",
+        "interpret tail latency across several runs.",
         "",
         "| Transport | Metric | Mean | Median | P95 | Max | Value |",
         "| --- | --- | ---: | ---: | ---: | ---: | ---: |",
