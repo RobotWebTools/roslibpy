@@ -34,9 +34,21 @@ disposal, it handles automatic reconnections when needed.
 Other classes that need an active connection with ROS receive this instance
 as an argument to their constructors.
 
+Transport selection
+-------------------
+
+CPython uses the ``twisted`` transport by default; IronPython uses ``cli``. The
+``asyncio`` transport can be selected per client, process-wide, or via the
+``ROSLIBPY_TRANSPORT`` environment variable::
+
+    ros = roslibpy.Ros(host='localhost', port=9090, transport='asyncio')
+    roslibpy.set_default_transport('asyncio')
+    ROSLIBPY_TRANSPORT=asyncio python my_script.py
+
 .. autoclass:: Ros
    :members:
 .. autofunction:: set_rosapi_timeout
+.. autofunction:: set_default_transport
 
 Main ROS concepts
 =================
@@ -144,6 +156,7 @@ from .core import (
     Time,
     Topic,
 )
+from .comm import set_default_transport
 from .ros import Ros, set_rosapi_timeout
 
 __all__ = [
@@ -167,6 +180,7 @@ __all__ = [
     "Service",
     "ServiceRequest",
     "ServiceResponse",
+    "set_default_transport",
     "set_rosapi_timeout",
     "Time",
     "Topic",

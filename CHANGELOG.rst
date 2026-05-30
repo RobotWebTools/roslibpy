@@ -12,6 +12,11 @@ Unreleased
 
 **Added**
 
+* Added an asyncio transport backend selectable with ``ROSLIBPY_TRANSPORT``,
+  ``set_default_transport()``, or the ``Ros(..., transport=...)`` argument.
+* Added transport-parametrized ROS integration tests for CPython, while
+  keeping IronPython on the ``cli`` transport.
+
 **Changed**
 
 **Fixed**

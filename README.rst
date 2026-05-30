@@ -68,12 +68,28 @@ To install **roslibpy**, simply use ``pip``::
 
     pip install roslibpy
 
+The default WebSocket transport on CPython uses Twisted/Autobahn. An asyncio
+transport is also available and can be installed with::
+
+    pip install roslibpy[asyncio]
+
 For IronPython, the ``pip`` command is slightly different::
 
     ipy -X:Frames -m pip install --user roslibpy
 
 Remember that you will need a working ROS setup including the
 **rosbridge server** and **TF2 web republisher** accessible within your network.
+
+Transport selection
+-------------------
+
+CPython uses the ``twisted`` transport by default; IronPython uses ``cli``. To
+select the asyncio transport, either pass it per client, set the process-wide
+default, or set the environment variable::
+
+    roslibpy.Ros(host='localhost', port=9090, transport='asyncio')
+    roslibpy.set_default_transport('asyncio')
+    ROSLIBPY_TRANSPORT=asyncio python my_script.py
 
 
 Documentation
