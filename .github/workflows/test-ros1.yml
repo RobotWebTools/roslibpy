@@ -54,6 +54,26 @@ jobs:
       - name: Run tests
         run: |
           pytest tests/ros1
+      - name: Run transport benchmark
+        if: matrix.name == 'ubuntu-py311'
+        continue-on-error: true
+        run: |
+          python benchmarks/transport.py \
+            --host 127.0.0.1 \
+            --port 9090 \
+            --service-count 300 \
+            --topic-count 500 \
+            --markdown transport-benchmark.md
+          cat transport-benchmark.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload transport benchmark
+        if: matrix.name == 'ubuntu-py311'
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: transport-benchmark
+          path: transport-benchmark.md
+          if-no-files-found: ignore
       - name: Tear down docker containers
+        if: always()
         run: |
           docker rm -f rosbridge
