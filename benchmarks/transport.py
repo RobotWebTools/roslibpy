@@ -14,11 +14,44 @@ from __future__ import print_function
 
 import argparse
 import json
+import os
 import statistics
+import subprocess
+import sys
+import tempfile
 import threading
 import time
 
 from roslibpy import Message, Ros, Topic
+
+
+CASES = {
+    "twisted": {
+        "transport": "twisted",
+        "event_loop": None,
+        "compression": None,
+    },
+    "asyncio": {
+        "transport": "asyncio",
+        "event_loop": "default",
+        "compression": "deflate",
+    },
+    "asyncio-uvloop": {
+        "transport": "asyncio",
+        "event_loop": "uvloop",
+        "compression": "deflate",
+    },
+    "asyncio-no-compression": {
+        "transport": "asyncio",
+        "event_loop": "default",
+        "compression": None,
+    },
+    "asyncio-uvloop-no-compression": {
+        "transport": "asyncio",
+        "event_loop": "uvloop",
+        "compression": None,
+    },
+}
 
 
 def percentile(values, pct):
@@ -37,7 +70,7 @@ def summary(values):
 
 def format_summary_line(transport, label, values):
     data = summary(values)
-    return "{:<8} {:<16} mean={mean:7.3f} ms median={median:7.3f} ms " "p95={p95:7.3f} ms max={max:7.3f} ms".format(
+    return "{:<30} {:<16} mean={mean:7.3f} ms median={median:7.3f} ms " "p95={p95:7.3f} ms max={max:7.3f} ms".format(
         transport, label, **data
     )
 
@@ -98,8 +131,8 @@ def service_latency(ros, count, warmup):
     return timings
 
 
-def topic_latency(ros, transport, count, warmup, delay):
-    topic_name = "/roslibpy_transport_benchmark_{}".format(transport)
+def topic_latency(ros, case_name, count, warmup, delay):
+    topic_name = "/roslibpy_transport_benchmark_{}".format(case_name.replace("-", "_"))
     listener = Topic(ros, topic_name, "std_msgs/String")
     publisher = Topic(ros, topic_name, "std_msgs/String")
 
@@ -138,7 +171,25 @@ def topic_latency(ros, transport, count, warmup, delay):
     return timings, len(timings) / total
 
 
-def run_transport(transport, args):
+def configure_case(case_name):
+    case = CASES[case_name]
+    if case["event_loop"] == "uvloop":
+        import uvloop
+
+        uvloop.install()
+
+    if case["transport"] == "asyncio":
+        from roslibpy.comm.comm_asyncio import AsyncioRosBridgeClientFactory
+
+        AsyncioRosBridgeClientFactory.compression = case["compression"]
+
+    return case
+
+
+def run_case(case_name, args):
+    case = configure_case(case_name)
+    transport = case["transport"]
+
     wait_rosbridge_ready(transport, args)
 
     ros = Ros(args.host, args.port, transport=transport)
@@ -148,12 +199,12 @@ def run_transport(transport, args):
     connect_time = time.perf_counter() - start
 
     services = service_latency(ros, args.service_count, args.warmup)
-    topics, topic_rate = topic_latency(ros, transport, args.topic_count, args.warmup, args.topic_delay)
+    topics, topic_rate = topic_latency(ros, case_name, args.topic_count, args.warmup, args.topic_delay)
 
-    print("{:<8} {:<16} {:7.3f} ms".format(transport, "initial connect", connect_time * 1000.0))
-    print_summary(transport, "get_time", services)
-    print_summary(transport, "topic rtt", topics)
-    print("{:<8} {:<16} {:7.1f} msg/s".format(transport, "topic rate", topic_rate))
+    print("{:<30} {:<16} {:7.3f} ms".format(case_name, "initial connect", connect_time * 1000.0))
+    print_summary(case_name, "get_time", services)
+    print_summary(case_name, "topic rtt", topics)
+    print("{:<30} {:<16} {:7.1f} msg/s".format(case_name, "topic rate", topic_rate))
 
     ros.close()
     time.sleep(0.5)
@@ -163,6 +214,47 @@ def run_transport(transport, args):
         "topics": topics,
         "topic_rate": topic_rate,
     }
+
+
+def run_case_subprocess(case_name, args):
+    with tempfile.NamedTemporaryFile(delete=False) as result_file:
+        result_path = result_file.name
+
+    command = [
+        sys.executable,
+        os.path.abspath(__file__),
+        "--case",
+        case_name,
+        "--host",
+        args.host,
+        "--port",
+        str(args.port),
+        "--service-count",
+        str(args.service_count),
+        "--topic-count",
+        str(args.topic_count),
+        "--warmup",
+        str(args.warmup),
+        "--topic-delay",
+        str(args.topic_delay),
+        "--connect-timeout",
+        str(args.connect_timeout),
+        "--ready-timeout",
+        str(args.ready_timeout),
+        "--ready-interval",
+        str(args.ready_interval),
+        "--json-result",
+        result_path,
+    ]
+    try:
+        subprocess.check_call(command)
+        with open(result_path) as fh:
+            return json.load(fh)
+    finally:
+        try:
+            os.remove(result_path)
+        except OSError:
+            pass
 
 
 def write_markdown(path, results):
@@ -186,7 +278,10 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=9090)
-    parser.add_argument("--transports", nargs="+", default=["twisted", "asyncio"])
+    parser.add_argument("--cases", nargs="+")
+    parser.add_argument("--transports", nargs="+", help=argparse.SUPPRESS)
+    parser.add_argument("--case", choices=sorted(CASES), help=argparse.SUPPRESS)
+    parser.add_argument("--json-result", help=argparse.SUPPRESS)
     parser.add_argument("--service-count", type=int, default=1000)
     parser.add_argument("--topic-count", type=int, default=1000)
     parser.add_argument("--warmup", type=int, default=50)
@@ -197,9 +292,20 @@ def main():
     parser.add_argument("--markdown", help="Write a Markdown summary table to this path")
     args = parser.parse_args()
 
+    if args.case:
+        result = run_case(args.case, args)
+        if args.json_result:
+            with open(args.json_result, "w") as fh:
+                json.dump(result, fh)
+        return
+
+    cases = args.cases or args.transports or ["twisted", "asyncio"]
+
     results = []
-    for transport in args.transports:
-        results.append((transport, run_transport(transport, args)))
+    for case_name in cases:
+        if case_name not in CASES:
+            raise ValueError("Unknown benchmark case {!r}; expected one of {}".format(case_name, sorted(CASES)))
+        results.append((case_name, run_case_subprocess(case_name, args)))
 
     if args.markdown:
         write_markdown(args.markdown, results)

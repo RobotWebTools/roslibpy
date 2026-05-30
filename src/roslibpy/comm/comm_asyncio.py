@@ -182,6 +182,7 @@ class AsyncioRosBridgeClientFactory(EventEmitterMixin):
     factor = DEFAULT_RECONNECT_FACTOR
     jitter = DEFAULT_RECONNECT_JITTER
     maxRetries = DEFAULT_MAX_RECONNECT_RETRIES
+    compression = "deflate"
 
     def __init__(self, url: str, headers: Optional[dict] = None) -> None:
         super(AsyncioRosBridgeClientFactory, self).__init__()
@@ -304,6 +305,7 @@ class AsyncioRosBridgeClientFactory(EventEmitterMixin):
                 async with ws_connect(
                     self._url,
                     additional_headers=self._headers,
+                    compression=self.compression,
                     open_timeout=None,  # we don't impose our own connect timeout here
                     close_timeout=5,
                 ) as ws:
