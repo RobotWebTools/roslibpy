@@ -71,5 +71,3 @@ def test_close_blocks_until_disconnect():
     # The "close" event must have fired by the time close() returned.
     assert closed_event.is_set(), "close() returned before clientConnectionLost fired"
     assert not ros.is_connected, "is_connected still True after close()"
-
-
