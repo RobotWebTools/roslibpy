@@ -7,6 +7,7 @@ prune docker
 
 include .bumpversion.cfg
 include .editorconfig
+include .readthedocs.yaml
 
 include AUTHORS.rst
 include CHANGELOG.rst
