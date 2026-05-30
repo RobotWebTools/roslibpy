@@ -66,3 +66,24 @@ def test_ros_passes_explicit_transport_to_factory_selector(monkeypatch):
     Ros("127.0.0.1", 9090, transport=TRANSPORT_ASYNCIO)
 
     assert selected == [TRANSPORT_ASYNCIO]
+
+
+def test_asyncio_protocol_sends_text_frames():
+    asyncio = pytest.importorskip("asyncio")
+
+    from roslibpy.comm.comm_asyncio import AsyncioRosBridgeProtocol
+
+    class WebSocket(object):
+        def __init__(self):
+            self.payload = None
+
+        async def send(self, payload):
+            self.payload = payload
+
+    websocket = WebSocket()
+    protocol = AsyncioRosBridgeProtocol(object(), websocket)
+
+    asyncio.run(protocol._send_async(b'{"op": "call_service"}'))
+
+    assert websocket.payload == '{"op": "call_service"}'
+    assert isinstance(websocket.payload, str)

@@ -114,6 +114,8 @@ class AsyncioRosBridgeProtocol(RosBridgeProtocol):
 
     async def _send_async(self, payload: bytes) -> None:
         try:
+            if isinstance(payload, bytes):
+                payload = payload.decode("utf-8")
             await self.ws.send(payload)
         except Exception:
             LOGGER.exception("Failed to send ROS bridge frame; connection likely dropped.")
