@@ -14,6 +14,13 @@ Unreleased
 
 **Changed**
 
+* ``Ros.close()`` now blocks until the underlying WebSocket has actually torn
+  down — it waits for the factory's ``"close"`` event (emitted from
+  ``clientConnectionLost``) instead of returning as soon as ``send_close()`` is
+  dispatched on the reactor thread. Downstream callers that immediately
+  construct a new ``Ros`` no longer race the previous socket's cleanup. The
+  ``"closing"`` event semantics are unchanged.
+
 **Fixed**
 
 * ``TwistedEventLoopManager`` no longer leaks one ``PythonLoggingObserver`` per

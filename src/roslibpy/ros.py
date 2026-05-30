@@ -76,20 +76,44 @@ class Ros(object):
         self.factory.connect()
 
     def close(self, timeout=CONNECTION_TIMEOUT):
-        """Disconnect from ROS."""
-        if self.is_connected:
-            wait_disconnect = threading.Event()
+        """Disconnect from ROS.
 
-            def _wrapper_callback(proto):
-                self.emit("closing")
-                proto.send_close()
-                wait_disconnect.set()
-                return proto
+        Blocks until the underlying WebSocket has actually torn down
+        (``clientConnectionLost`` fired). Prior to 2.1, ``close()``
+        returned as soon as ``send_close()`` had been dispatched on the
+        reactor thread; callers that immediately constructed a new ``Ros``
+        could race the previous socket's cleanup, occasionally causing
+        the next ``run()`` to time out under contention.
+        """
+        if not self.is_connected:
+            return
 
-            self.factory.on_ready(_wrapper_callback)
+        wait_disconnect = threading.Event()
 
-            if not wait_disconnect.wait(timeout):
-                raise RosTimeoutError("Failed to disconnect to ROS")
+        def _on_close(*_args):
+            wait_disconnect.set()
+
+        # `clientConnectionLost` on the factory emits the "close" event once
+        # the websocket has actually been torn down. Use `once` so the
+        # listener is auto-removed on first fire — protects against the
+        # ReconnectingClientFactory triggering a later non-manual close.
+        self.factory.once("close", _on_close)
+
+        def _wrapper_callback(proto):
+            self.emit("closing")
+            proto.send_close()
+            return proto
+
+        self.factory.on_ready(_wrapper_callback)
+
+        if not wait_disconnect.wait(timeout):
+            # Detach the listener so it doesn't fire on a later reconnect
+            # cycle and leak a reference to this Ros instance.
+            try:
+                self.factory.off("close", _on_close)
+            except Exception:
+                pass
+            raise RosTimeoutError("Failed to disconnect to ROS")
 
     def run(self, timeout=CONNECTION_TIMEOUT):
         """Kick-starts a non-blocking event loop.

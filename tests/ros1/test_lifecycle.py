@@ -10,6 +10,8 @@ don't retry-loop.
 
 from __future__ import print_function
 
+import threading
+
 from roslibpy import Ros
 
 HOST = "127.0.0.1"
@@ -46,5 +48,28 @@ def test_log_observer_does_not_leak():
         "Leaked %d twisted log observers across 10 lifecycle cycles "
         "(expected at most 1)" % (final - initial)
     )
+
+
+def test_close_blocks_until_disconnect():
+    """``Ros.close()`` must not return until the WebSocket is actually closed.
+
+    Before A2 the call returned once ``send_close`` had been dispatched on
+    the reactor thread — the protocol's ``onClose`` would fire shortly
+    after, leaving a brief window where ``is_connected`` could still read
+    True. Now ``close()`` blocks on ``clientConnectionLost`` so the
+    contract matches the name.
+    """
+    ros = Ros(URL)
+    ros.run()
+    assert ros.is_connected
+
+    closed_event = threading.Event()
+    ros.on("close", lambda _: closed_event.set())
+
+    ros.close()
+
+    # The "close" event must have fired by the time close() returned.
+    assert closed_event.is_set(), "close() returned before clientConnectionLost fired"
+    assert not ros.is_connected, "is_connected still True after close()"
 
 
