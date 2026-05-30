@@ -64,6 +64,29 @@ def wait_connected(ros, timeout):
     raise RuntimeError("Timed out waiting for connection")
 
 
+def wait_rosbridge_ready(transport, args):
+    deadline = time.time() + args.ready_timeout
+    last_error = None
+    while time.time() < deadline:
+        ros = None
+        try:
+            ros = Ros(args.host, args.port, transport=transport)
+            ros.run()
+            wait_connected(ros, args.connect_timeout)
+            ros.get_time()
+            return
+        except Exception as error:
+            last_error = error
+            time.sleep(args.ready_interval)
+        finally:
+            if ros is not None:
+                try:
+                    ros.close()
+                except Exception:
+                    pass
+    raise RuntimeError("Timed out waiting for rosbridge readiness: {}".format(last_error))
+
+
 def service_latency(ros, count, warmup):
     for _ in range(warmup):
         ros.get_time()
@@ -116,6 +139,8 @@ def topic_latency(ros, transport, count, warmup, delay):
 
 
 def run_transport(transport, args):
+    wait_rosbridge_ready(transport, args)
+
     ros = Ros(args.host, args.port, transport=transport)
     start = time.perf_counter()
     ros.run()
@@ -167,6 +192,8 @@ def main():
     parser.add_argument("--warmup", type=int, default=50)
     parser.add_argument("--topic-delay", type=float, default=0.0005)
     parser.add_argument("--connect-timeout", type=float, default=5.0)
+    parser.add_argument("--ready-timeout", type=float, default=30.0)
+    parser.add_argument("--ready-interval", type=float, default=0.5)
     parser.add_argument("--markdown", help="Write a Markdown summary table to this path")
     args = parser.parse_args()
 
