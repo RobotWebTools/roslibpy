@@ -2,11 +2,13 @@ import sys
 
 import pytest
 
-from roslibpy import Ros
-from roslibpy import set_default_transport
-from roslibpy.comm import TRANSPORT_ASYNCIO, TRANSPORT_CLI, TRANSPORT_TWISTED
-from roslibpy.comm import _resolve_transport
-
+from roslibpy import Ros, set_default_transport
+from roslibpy.comm import (
+    TRANSPORT_ASYNCIO,
+    TRANSPORT_CLI,
+    TRANSPORT_TWISTED,
+    _resolve_transport,
+)
 
 PLATFORM_DEFAULT = TRANSPORT_CLI if sys.platform == "cli" else TRANSPORT_TWISTED
 

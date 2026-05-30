@@ -4,7 +4,7 @@ import logging
 import threading
 
 from . import Message, Param, Service, ServiceRequest, Time
-from .comm import RosBridgeClientFactory, select_factory
+from .comm import select_factory
 from .core import RosTimeoutError
 
 __all__ = ["Ros", "set_rosapi_timeout"]

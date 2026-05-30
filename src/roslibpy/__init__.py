@@ -141,6 +141,7 @@ from .__version__ import (
     __url__,
     __version__,
 )
+from .comm import set_default_transport
 from .core import (
     ActionClient,
     Feedback,
@@ -156,7 +157,6 @@ from .core import (
     Time,
     Topic,
 )
-from .comm import set_default_transport
 from .ros import Ros, set_rosapi_timeout
 
 __all__ = [

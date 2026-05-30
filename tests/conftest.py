@@ -2,7 +2,6 @@ import sys
 
 import pytest
 
-
 ROS_TRANSPORTS = ("cli",) if sys.platform == "cli" else ("twisted", "asyncio")
 
 
