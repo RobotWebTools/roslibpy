@@ -10,8 +10,8 @@ port = 9090
 url = "ws://%s:%d" % (host, port)
 
 
-def test_reconnect_does_not_trigger_on_client_close():
-    ros = Ros(host, port)
+def test_reconnect_does_not_trigger_on_client_close(ros_transport):
+    ros = Ros(host, port, transport=ros_transport)
     ros.run()
 
     assert ros.is_connected, "ROS initially connected"
@@ -25,22 +25,22 @@ def test_reconnect_does_not_trigger_on_client_close():
     assert not ros.is_connecting, "Not trying to re-connect"
 
 
-def test_connection():
-    ros = Ros(host, port)
+def test_connection(ros_transport):
+    ros = Ros(host, port, transport=ros_transport)
     ros.run()
     assert ros.is_connected
     ros.close()
 
 
-def test_url_connection():
-    ros = Ros(url)
+def test_url_connection(ros_transport):
+    ros = Ros(url, transport=ros_transport)
     ros.run()
     assert ros.is_connected
     ros.close()
 
 
-def test_closing_event():
-    ros = Ros(url)
+def test_closing_event(ros_transport):
+    ros = Ros(url, transport=ros_transport)
     ros.run()
     ctx = dict(closing_event_called=False, was_still_connected=False)
 
@@ -60,12 +60,12 @@ def test_closing_event():
     assert closing_was_handled_synchronously_before_close
 
 
-def test_multithreaded_connect_disconnect():
+def test_multithreaded_connect_disconnect(ros_transport):
     CONNECTIONS = 30
     clients = []
 
     def connect(clients):
-        ros = Ros(url)
+        ros = Ros(url, transport=ros_transport)
         ros.run()
         clients.append(ros)
 

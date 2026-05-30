@@ -1,8 +1,8 @@
 from roslibpy import Param, Ros
 
 
-def test_param_manipulation():
-    ros = Ros("127.0.0.1", 9090)
+def test_param_manipulation(ros_transport):
+    ros = Ros("127.0.0.1", 9090, transport=ros_transport)
     ros.run()
 
     param = Param(ros, "test_param")

@@ -6,8 +6,8 @@ from roslibpy import Ros
 from roslibpy.ros1.actionlib import ActionClient, Goal, GoalStatus, SimpleActionServer
 
 
-def test_action_success():
-    ros = Ros("127.0.0.1", 9090)
+def test_action_success(ros_transport):
+    ros = Ros("127.0.0.1", 9090, transport=ros_transport)
     ros.run()
 
     server = SimpleActionServer(ros, "/test_action", "actionlib/TestAction")
@@ -31,8 +31,8 @@ def test_action_success():
     ros.close()
 
 
-def test_action_preemt():
-    ros = Ros("127.0.0.1", 9090)
+def test_action_preemt(ros_transport):
+    ros = Ros("127.0.0.1", 9090, transport=ros_transport)
     ros.run()
 
     server = SimpleActionServer(ros, "/test_action", "actionlib/TestAction")

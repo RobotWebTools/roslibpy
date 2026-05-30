@@ -5,8 +5,8 @@ import time
 from roslibpy import Ros, Service, ServiceRequest
 
 
-def test_add_two_ints_service():
-    ros = Ros("127.0.0.1", 9090)
+def test_add_two_ints_service(ros_transport):
+    ros = Ros("127.0.0.1", 9090, transport=ros_transport)
     ros.run()
 
     def add_two_ints(request, response):
@@ -29,8 +29,8 @@ def test_add_two_ints_service():
     ros.close()
 
 
-def test_empty_service():
-    ros = Ros("127.0.0.1", 9090)
+def test_empty_service(ros_transport):
+    ros = Ros("127.0.0.1", 9090, transport=ros_transport)
     ros.run()
 
     service = Service(ros, "/test_empty_service", "std_srvs/Empty")

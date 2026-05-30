@@ -4,9 +4,9 @@ from roslibpy import Ros
 from roslibpy.tf import TFClient
 
 
-def test_tf_test():
+def test_tf_test(ros_transport):
     context = dict(wait=threading.Event(), counter=0)
-    ros = Ros("127.0.0.1", 9090)
+    ros = Ros("127.0.0.1", 9090, transport=ros_transport)
     ros.run()
 
     tf_client = TFClient(ros, fixed_frame="world")
