@@ -16,6 +16,14 @@ Unreleased
 
 **Fixed**
 
+* ``TwistedEventLoopManager`` no longer leaks one ``PythonLoggingObserver`` per
+  ``Ros`` instance. The observer is now a process-wide singleton — there's only
+  ever one twisted-log → stdlib-logging bridge regardless of how many ``Ros``
+  instances come and go. Long-running pytest sessions that create many
+  short-lived ``Ros`` instances were accumulating one observer per cycle,
+  slowing every log emission linearly and contributing to the occasional
+  ``RosTimeoutError`` flakes that motivated this lifecycle pass.
+
 **Deprecated**
 
 **Removed**

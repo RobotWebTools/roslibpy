@@ -156,6 +156,37 @@ class AutobahnRosBridgeClientFactory(EventEmitterMixin, ReconnectingClientFactor
         cls.maxRetries = max_retries
 
 
+# The twisted reactor is a process-wide singleton, so the log observer that
+# fans twisted's log events into the stdlib `logging` module is one too. Any
+# Python process only ever needs one of these registered — registering more
+# means every log event walks an O(n) observer list and ``globalLogPublisher``
+# keeps strong references to every observer for the life of the process.
+#
+# Prior to 2.1, ``TwistedEventLoopManager.__init__`` started a fresh
+# ``PythonLoggingObserver`` per instance, and downstream wrappers that call
+# ``Ros.close()`` (rather than ``Ros.terminate()``, which stops the reactor
+# permanently) never invoked ``manager.terminate()`` and so never stopped the
+# observer. Long-running pytest sessions that create many ``Ros`` instances
+# would accumulate one observer per ``Ros``, slowing every log emission
+# linearly and contributing to occasional ``RosTimeoutError`` flakes on the
+# next ``Ros.run()``.
+_LOG_OBSERVER = None
+_LOG_OBSERVER_LOCK = threading.Lock()
+
+
+def _ensure_log_observer_started():
+    """Lazily start the single process-wide twisted log → stdlib logging bridge."""
+    global _LOG_OBSERVER
+    if _LOG_OBSERVER is not None:
+        return
+    with _LOG_OBSERVER_LOCK:
+        if _LOG_OBSERVER is not None:
+            return
+        observer = log.PythonLoggingObserver()
+        observer.start()
+        _LOG_OBSERVER = observer
+
+
 class TwistedEventLoopManager(object):
     """Manage the main event loop using Twisted reactor.
 
@@ -166,8 +197,11 @@ class TwistedEventLoopManager(object):
     """
 
     def __init__(self):
-        self._log_observer = log.PythonLoggingObserver()
-        self._log_observer.start()
+        # Twisted's reactor is a process singleton — so is the observer that
+        # bridges twisted's log events into stdlib `logging`. See the module-
+        # level comment for the lifecycle details.
+        _ensure_log_observer_started()
+        self._log_observer = _LOG_OBSERVER
 
     def run(self):
         """Kick-starts a non-blocking event loop.
@@ -273,4 +307,13 @@ class TwistedEventLoopManager(object):
         if self._thread:
             self._thread.join()
 
-        self._log_observer.stop()
+        # The observer is the process-wide singleton (see module top). Stop
+        # it once on terminate — the reactor cannot be restarted after stop,
+        # so no future TwistedEventLoopManager will need the bridge in this
+        # process. Subsequent terminates no-op.
+        global _LOG_OBSERVER
+        with _LOG_OBSERVER_LOCK:
+            if _LOG_OBSERVER is not None:
+                _LOG_OBSERVER.stop()
+                _LOG_OBSERVER = None
+        self._log_observer = None
