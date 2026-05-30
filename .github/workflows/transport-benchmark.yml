@@ -1,4 +1,4 @@
-name: Test against ROS 1
+name: Transport benchmark
 
 on:
   push:
@@ -9,33 +9,17 @@ on:
   pull_request:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
-  test-ros1:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        name: [
-          "ubuntu-py39",
-          "ubuntu-py310",
-          "ubuntu-py311",
-        ]
-        include:
-          - name: "ubuntu-py39"
-            os: ubuntu-latest
-            python-version: "3.9"
-          - name: "ubuntu-py310"
-            os: ubuntu-latest
-            python-version: "3.10"
-          - name: "ubuntu-py311"
-            os: ubuntu-latest
-            python-version: "3.11"
+  transport-benchmark:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python 3.11
         uses: actions/setup-python@v6
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.11"
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -48,12 +32,24 @@ jobs:
           docker build -t gramaziokohler/rosbridge:integration_tests_ros1 ./docker/ros1
           docker run -d -p 9090:9090 --name rosbridge gramaziokohler/rosbridge:integration_tests_ros1 /bin/bash -c "roslaunch /integration-tests.launch"
           docker ps -a
-      - name: Run linter
+      - name: Run transport benchmark
+        continue-on-error: true
         run: |
-          invoke check
-      - name: Run tests
-        run: |
-          pytest tests/ros1
+          python benchmarks/transport.py \
+            --host 127.0.0.1 \
+            --port 9090 \
+            --service-count 300 \
+            --topic-count 500 \
+            --markdown transport-benchmark.md
+          cat transport-benchmark.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload transport benchmark
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: transport-benchmark
+          path: transport-benchmark.md
+          if-no-files-found: ignore
       - name: Tear down docker containers
         if: always()
         run: |
