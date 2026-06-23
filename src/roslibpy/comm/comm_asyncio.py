@@ -1,6 +1,6 @@
 """Asyncio-based transport for roslibpy.
 
-Opt-in alternative to the default twisted/autobahn transport. Selected via:
+Opt-in alternative to the default Twisted-based transport. Selected via:
 
 * env var ``ROSLIBPY_TRANSPORT=asyncio``
 * module-level ``roslibpy.set_default_transport("asyncio")``
@@ -21,18 +21,27 @@ is unaffected — only the transport layer changes.
 Dependencies
 ------------
 
-This module imports the ``websockets`` library lazily; it is declared as an
-optional extra (``roslibpy[asyncio]``). The transport raises a clear error if
-selected without the dependency available.
+This transport reuses the very same Autobahn WebSocket stack as the default
+transport; the only difference is that it runs on an asyncio event loop
+(``autobahn.asyncio``) rather than the Twisted reactor. No extra dependencies
+are required beyond Autobahn, which roslibpy already depends on.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
+import random
 import threading
 from typing import Any, Callable, Optional
-from urllib.parse import urlparse
+
+from autobahn.asyncio.websocket import WebSocketClientFactory, WebSocketClientProtocol
+from autobahn.websocket.compress import (
+    PerMessageDeflateOffer,
+    PerMessageDeflateResponse,
+    PerMessageDeflateResponseAccept,
+)
+from autobahn.websocket.util import create_url
 
 from ..core import RosTimeoutError
 from ..event_emitter import EventEmitterMixin
@@ -41,7 +50,9 @@ from . import RosBridgeProtocol
 LOGGER = logging.getLogger("roslibpy")
 
 # Defaults matched to ReconnectingClientFactory's behaviour so users moving
-# between transports see the same retry cadence.
+# between transports see the same retry cadence. Autobahn's asyncio integration
+# does not ship a reconnecting factory (unlike the Twisted side), so this
+# transport reimplements the same exponential backoff.
 DEFAULT_INITIAL_RECONNECT_DELAY = 1.0
 DEFAULT_MAX_RECONNECT_DELAY = 3600.0
 DEFAULT_RECONNECT_FACTOR = 2.7
@@ -60,123 +71,98 @@ def _get_shared_manager() -> "AsyncioEventLoopManager":
     if _MANAGER_SINGLETON is not None:
         return _MANAGER_SINGLETON
     with _MANAGER_SINGLETON_LOCK:
-        if _MANAGER_SINGLETON is not None:
-            return _MANAGER_SINGLETON
-        _MANAGER_SINGLETON = AsyncioEventLoopManager()
+        if _MANAGER_SINGLETON is None:
+            _MANAGER_SINGLETON = AsyncioEventLoopManager()
         return _MANAGER_SINGLETON
 
 
-def _import_websockets():
-    """Import the optional ``websockets`` dependency lazily, with a clear error."""
-    try:
-        import websockets  # noqa: F401
-        from websockets.asyncio.client import connect as ws_connect  # noqa: F401
-        from websockets.exceptions import ConnectionClosed, InvalidStatus  # noqa: F401
-    except ImportError as exc:  # pragma: no cover — exercised by missing-extra test
-        raise ImportError(
-            "The asyncio transport requires the 'websockets' package. " "Install with: pip install 'roslibpy[asyncio]'"
-        ) from exc
-    return ws_connect, ConnectionClosed, InvalidStatus
+class AsyncioRosBridgeProtocol(RosBridgeProtocol, WebSocketClientProtocol):
+    """ROS Bridge protocol over an Autobahn asyncio WebSocket connection.
 
-
-class AsyncioRosBridgeProtocol(RosBridgeProtocol):
-    """ROS Bridge protocol implementation over an asyncio websockets connection.
-
-    Instances are owned by :class:`AsyncioRosBridgeClientFactory`; user code
-    interacts with the factory, not the protocol directly. ``send_message``
-    and ``send_close`` are thread-safe — they schedule the IO onto the
-    background loop via ``call_soon_threadsafe``.
+    Mirrors :class:`AutobahnRosBridgeProtocol` almost exactly — the protocol
+    callbacks (``onConnect`` / ``onOpen`` / ``onMessage`` / ``onClose``) are
+    identical. The only difference is that ``send_message`` / ``send_close``
+    schedule the IO onto the background asyncio loop (via
+    ``call_soon_threadsafe``) instead of the Twisted reactor.
     """
 
-    def __init__(self, factory: "AsyncioRosBridgeClientFactory", ws_connection: Any) -> None:
-        super(AsyncioRosBridgeProtocol, self).__init__()
-        self.factory = factory
-        self.ws = ws_connection
+    def __init__(self, *args, **kwargs):
+        super(AsyncioRosBridgeProtocol, self).__init__(*args, **kwargs)
         self._manual_disconnect = False
-        self._closed = False
-        self._send_queue = asyncio.Queue()
-        self._send_task = asyncio.create_task(self._send_loop())
 
-    def send_message(self, payload: bytes) -> None:
+    def onConnect(self, response):
+        LOGGER.debug("Server connected: %s", response.peer)
+
+    def onOpen(self):
+        LOGGER.info("Connection to ROS ready.")
+        self._manual_disconnect = False
+        self.factory.ready(self)
+
+    def onMessage(self, payload, isBinary):
+        if isBinary:
+            raise NotImplementedError("Add support for binary messages")
+
+        try:
+            self.on_message(payload)
+        except Exception:
+            LOGGER.exception(
+                "Exception on start_listening while trying to handle message received."
+                + "It could indicate a bug in user code on message handlers. Message skipped."
+            )
+
+    def onClose(self, wasClean, code, reason):
+        LOGGER.info("WebSocket connection closed: Code=%s, Reason=%s", str(code), reason)
+        # Notify the factory so it can clear its protocol reference and, unless
+        # this was a manual disconnect, schedule a reconnect attempt.
+        if self.factory is not None:
+            self.factory.connection_lost(self)
+
+    def send_message(self, payload):
         """Send an already-encoded ROS bridge message frame.
 
         Safe to call from any thread; the actual send is scheduled onto the
         background loop.
         """
-        if self._closed:
-            return
         loop = self.factory.manager.loop
         if loop is None or loop.is_closed():
             return
-        loop.call_soon_threadsafe(self._enqueue_send, payload)
+        loop.call_soon_threadsafe(self._send, payload)
 
-    def _enqueue_send(self, payload: bytes) -> None:
-        if not self._closed:
-            self._send_queue.put_nowait(payload)
-
-    async def _send_loop(self) -> None:
+    def _send(self, payload):
         try:
-            while True:
-                payload = await self._send_queue.get()
-                try:
-                    await self._send_async(payload)
-                finally:
-                    self._send_queue.task_done()
-        except asyncio.CancelledError:
-            pass
-
-    async def _send_async(self, payload: bytes) -> None:
-        try:
-            if isinstance(payload, bytes):
-                payload = payload.decode("utf-8")
-            await self.ws.send(payload)
+            # ROS bridge frames are JSON text; send them as (non-binary) text
+            # frames, matching the autobahn/twisted transport.
+            self.sendMessage(payload, isBinary=False)
         except Exception:
             LOGGER.exception("Failed to send ROS bridge frame; connection likely dropped.")
 
-    def send_close(self) -> None:
+    def send_close(self):
         """Initiate a clean WebSocket close.
 
-        Sets the manual-disconnect flag so the factory's reconnect supervisor
-        knows to stand down, then asks the loop to close the socket.
+        Sets the manual-disconnect flag so the factory's reconnect logic knows
+        to stand down, then asks the loop to close the socket.
         """
         self._manual_disconnect = True
-        if self._closed:
-            return
         loop = self.factory.manager.loop
         if loop is None or loop.is_closed():
             return
-        loop.call_soon_threadsafe(self._schedule_close)
-
-    def _schedule_close(self) -> None:
-        asyncio.create_task(self._close_after_pending_sends())
-
-    async def _close_after_pending_sends(self) -> None:
-        await self._send_queue.join()
-        await self._close_async()
-
-    async def _close_async(self) -> None:
-        try:
-            await self.ws.close()
-        except Exception:
-            LOGGER.debug("Error during WebSocket close (often harmless if already closed).", exc_info=True)
-        finally:
-            self._stop_sender()
-
-    def _stop_sender(self) -> None:
-        if not self._send_task.done():
-            self._send_task.cancel()
+        loop.call_soon_threadsafe(self.sendClose)
 
 
-class AsyncioRosBridgeClientFactory(EventEmitterMixin):
-    """ROS Bridge client factory backed by the ``websockets`` library on asyncio.
+class AsyncioRosBridgeClientFactory(EventEmitterMixin, WebSocketClientFactory):
+    """ROS Bridge client factory built on Autobahn's asyncio integration.
 
     Mirrors the public surface of :class:`AutobahnRosBridgeClientFactory` so
     that callers (``Ros`` and friends) don't care which transport is selected.
+    Because the asyncio side of Autobahn has no ``ReconnectingClientFactory``
+    equivalent, this factory implements its own exponential-backoff reconnect.
     """
+
+    protocol = AsyncioRosBridgeProtocol
 
     # Class-level reconnect tuning, kept as class attributes so the
     # `set_initial_delay` / `set_max_delay` / `set_max_retries` classmethods
-    # behave like their autobahn counterparts.
+    # behave like their autobahn/twisted counterparts.
     initialDelay = DEFAULT_INITIAL_RECONNECT_DELAY
     maxDelay = DEFAULT_MAX_RECONNECT_DELAY
     factor = DEFAULT_RECONNECT_FACTOR
@@ -184,60 +170,59 @@ class AsyncioRosBridgeClientFactory(EventEmitterMixin):
     maxRetries = DEFAULT_MAX_RECONNECT_RETRIES
     compression = "deflate"
 
-    def __init__(self, url: str, headers: Optional[dict] = None) -> None:
-        super(AsyncioRosBridgeClientFactory, self).__init__()
-        self._validate_url(url)
-        self._url = url
-        self._headers = headers
+    def __init__(self, *args, **kwargs):
+        # Autobahn's asyncio factory binds to an event loop at construction
+        # time, so make sure our background loop is up and hand it over.
+        self._manager = _get_shared_manager()
+        self._manager.run()
+        kwargs.setdefault("loop", self._manager.loop)
+
+        super(AsyncioRosBridgeClientFactory, self).__init__(*args, **kwargs)
+
         self._proto: Optional[AsyncioRosBridgeProtocol] = None
-        self._manager: Optional[AsyncioEventLoopManager] = None
         # Lock guarding `_proto` reads/writes in on_ready / ready. Closes the
         # TOCTOU race between checking ``_proto`` and registering a one-shot
-        # "ready" listener that exists in the autobahn factory.
+        # "ready" listener.
         self._proto_lock = threading.Lock()
-        # Background reconnect supervisor task, owned by the loop thread.
-        self._supervisor_task: Optional[asyncio.Task] = None
-        self._stop_supervisor = False
+        # Reconnect bookkeeping, mutated only from the loop thread.
+        self._stop = False
         self._retry_count = 0
+        self._reconnect_delay = self.initialDelay
+
+        self.setProtocolOptions(closeHandshakeTimeout=5)
+        self._configure_compression()
 
     # ------------------------------------------------------------------
     # Public surface mirroring AutobahnRosBridgeClientFactory
     # ------------------------------------------------------------------
 
-    @staticmethod
-    def _validate_url(url: str) -> None:
-        parsed = urlparse(url)
-        if parsed.scheme not in ("ws", "wss") or not parsed.netloc:
-            raise ValueError("WebSocket URL must use the ws:// or wss:// schema")
-
-    def connect(self) -> None:
+    def connect(self):
         """Schedule the initial WebSocket connection on the background loop."""
+        self._stop = False
+        self._retry_count = 0
+        self._reconnect_delay = self.initialDelay
+
         manager = self.manager
         manager.run()  # ensure background loop is up
         loop = manager.loop
         assert loop is not None
-        # Schedule the supervisor task; it owns the connect / reconnect loop.
-        loop.call_soon_threadsafe(self._launch_supervisor)
-
-    def _launch_supervisor(self) -> None:
-        if self._supervisor_task is not None and not self._supervisor_task.done():
-            return
-        self._stop_supervisor = False
-        self._supervisor_task = asyncio.create_task(self._supervise_connection())
+        loop.call_soon_threadsafe(self._open_connection)
 
     @property
-    def is_connected(self) -> bool:
-        proto = self._proto
-        return proto is not None and not proto._closed
+    def is_connected(self):
+        """Indicate if the WebSocket connection is open or not.
 
-    def on_ready(self, callback: Callable[[AsyncioRosBridgeProtocol], None]) -> None:
+        Returns:
+            bool: True if WebSocket is connected, False otherwise.
+        """
+        proto = self._proto
+        return proto is not None and not proto._manual_disconnect
+
+    def on_ready(self, callback):
         """Register a callback to fire as soon as the connection is established.
 
         If the connection is already established, fires synchronously. Otherwise
-        registers a one-shot listener for the next "ready" event. Protected by a
-        lock so the TOCTOU race between checking ``_proto`` and registering the
-        listener can't drop callbacks the way the autobahn variant occasionally
-        did under reactor contention.
+        registers a one-shot listener for the next "ready" event.
         """
         proto_to_fire: Optional[AsyncioRosBridgeProtocol] = None
         with self._proto_lock:
@@ -248,133 +233,134 @@ class AsyncioRosBridgeClientFactory(EventEmitterMixin):
         if proto_to_fire is not None:
             callback(proto_to_fire)
 
-    def ready(self, proto: AsyncioRosBridgeProtocol) -> None:
+    def ready(self, proto):
         """Mark the connection as ready and notify any pending listeners."""
         with self._proto_lock:
             self._proto = proto
-            self._retry_count = 0  # reset backoff on every successful connect
+        # Reset backoff on every successful connect.
+        self._retry_count = 0
+        self._reconnect_delay = self.initialDelay
         self.emit("ready", proto)
 
-    @classmethod
-    def create_url(cls, host: str, port: Optional[int] = None, is_secure: bool = False) -> str:
-        if port is None:
-            return host
-        scheme = "wss" if is_secure else "ws"
-        return "{}://{}:{}/".format(scheme, host, port)
+    def connection_lost(self, proto):
+        """Handle a dropped connection (called from the protocol's ``onClose``).
 
-    @classmethod
-    def set_max_delay(cls, max_delay: float) -> None:
-        """Set the maximum reconnect backoff delay in seconds (3600 by default)."""
-        cls.maxDelay = max_delay
-
-    @classmethod
-    def set_initial_delay(cls, initial_delay: float) -> None:
-        """Set the initial reconnect backoff delay in seconds (1 by default)."""
-        cls.initialDelay = initial_delay
-
-    @classmethod
-    def set_max_retries(cls, max_retries: Optional[int]) -> None:
-        """Set the max reconnect attempts when the connection is lost (unbounded by default)."""
-        cls.maxRetries = max_retries
-
-    # ------------------------------------------------------------------
-    # Supervisor coroutine: owns connect / reconnect with backoff
-    # ------------------------------------------------------------------
-
-    @property
-    def manager(self) -> "AsyncioEventLoopManager":
-        if self._manager is None:
-            self._manager = _get_shared_manager()
-        return self._manager
-
-    async def _supervise_connection(self) -> None:
-        """Maintain an open connection, reconnecting with exponential backoff
-        if it drops unexpectedly.
-
-        Stops when a manual disconnect is observed (``proto._manual_disconnect``
-        set by ``send_close()``) or when ``maxRetries`` is exhausted.
+        Clears the protocol reference, emits ``close`` (mirroring the autobahn
+        factory's ``clientConnectionLost`` emit), and unless the disconnect was
+        manual, schedules a reconnect with exponential backoff.
         """
-        import random
-
-        ws_connect, ConnectionClosed, InvalidStatus = _import_websockets()
-        delay = self.initialDelay
-
-        while not self._stop_supervisor:
-            try:
-                LOGGER.debug("Connecting to %s...", self._url)
-                async with ws_connect(
-                    self._url,
-                    additional_headers=self._headers,
-                    compression=self.compression,
-                    open_timeout=None,  # we don't impose our own connect timeout here
-                    close_timeout=5,
-                ) as ws:
-                    LOGGER.info("Connection to ROS ready.")
-                    proto = AsyncioRosBridgeProtocol(self, ws)
-                    self.ready(proto)
-                    # Reset backoff on every successful connection.
-                    delay = self.initialDelay
-                    self._retry_count = 0
-                    try:
-                        await self._receive_loop(proto)
-                    finally:
-                        self._on_connection_closed(proto)
-                        if proto._manual_disconnect:
-                            LOGGER.debug("Manual disconnect — supervisor exiting.")
-                            self._stop_supervisor = True
-                            break
-            except (ConnectionClosed, OSError, InvalidStatus) as exc:
-                LOGGER.debug("Connection attempt failed: %s", exc)
-            except asyncio.CancelledError:
-                raise
-            except Exception:  # noqa: BLE001
-                LOGGER.exception("Unexpected error in connection supervisor.")
-
-            if self._stop_supervisor:
-                break
-
-            self._retry_count += 1
-            if self.maxRetries is not None and self._retry_count > self.maxRetries:
-                LOGGER.warning("Exceeded max reconnect retries (%s); supervisor exiting.", self.maxRetries)
-                break
-
-            # Apply jittered exponential backoff, capped at maxDelay.
-            jittered = delay + (random.random() * 2 - 1) * delay * self.jitter
-            sleep_for = max(0.0, min(jittered, self.maxDelay))
-            LOGGER.debug("Will retry connection in %.2fs (attempt %d).", sleep_for, self._retry_count)
-            try:
-                await asyncio.sleep(sleep_for)
-            except asyncio.CancelledError:
-                raise
-            delay = min(delay * self.factor, self.maxDelay)
-
-    async def _receive_loop(self, proto: AsyncioRosBridgeProtocol) -> None:
-        """Pump incoming WebSocket frames into the protocol's ``on_message``."""
-        ws_connect, ConnectionClosed, InvalidStatus = _import_websockets()
-        try:
-            async for payload in proto.ws:
-                if isinstance(payload, str):
-                    payload = payload.encode("utf-8")
-                try:
-                    proto.on_message(payload)
-                except Exception:
-                    LOGGER.exception("Exception in user message handler; skipping frame.")
-        except ConnectionClosed:
-            LOGGER.info("WebSocket connection closed.")
-
-    def _on_connection_closed(self, proto: AsyncioRosBridgeProtocol) -> None:
-        proto._closed = True
-        proto._stop_sender()
         with self._proto_lock:
             self._proto = None
-        # Notify listeners that the connection is gone. Matches the autobahn
-        # factory's "close" emit out of clientConnectionLost; downstream code
-        # (e.g. ``Ros.close()`` post-2.1 lifecycle work) uses this to know
-        # the socket is actually torn down.
         try:
             self.emit("close", proto)
         except Exception:
             LOGGER.exception("Error in user 'close' listener.")
+
+        if proto._manual_disconnect or self._stop:
+            self._stop = True
+            return
+        self._schedule_reconnect()
+
+    @classmethod
+    def create_url(cls, host, port=None, is_secure=False):
+        url = host if port is None else create_url(host, port, is_secure)
+        return url
+
+    @classmethod
+    def set_max_delay(cls, max_delay):
+        """Set the maximum reconnect backoff delay in seconds (3600 by default)."""
+        LOGGER.debug("Updating max delay to {} seconds".format(max_delay))
+        cls.maxDelay = max_delay
+
+    @classmethod
+    def set_initial_delay(cls, initial_delay):
+        """Set the initial reconnect backoff delay in seconds (1 by default)."""
+        LOGGER.debug("Updating initial delay to {} seconds".format(initial_delay))
+        cls.initialDelay = initial_delay
+
+    @classmethod
+    def set_max_retries(cls, max_retries):
+        """Set the max reconnect attempts when the connection is lost (unbounded by default)."""
+        LOGGER.debug("Updating max retries to {}".format(max_retries))
+        cls.maxRetries = max_retries
+
+    @property
+    def manager(self) -> "AsyncioEventLoopManager":
+        """Get an instance of the event loop manager for this factory."""
+        if self._manager is None:
+            self._manager = _get_shared_manager()
+        return self._manager
+
+    # ------------------------------------------------------------------
+    # Connect / reconnect machinery (runs on the loop thread)
+    # ------------------------------------------------------------------
+
+    def _configure_compression(self):
+        """Enable per-message deflate negotiation unless compression is disabled."""
+        if not self.compression or self.compression == "none":
+            return
+
+        offers = [PerMessageDeflateOffer()]
+        self.setProtocolOptions(perMessageCompressionOffers=offers)
+
+        def accept(response):
+            if isinstance(response, PerMessageDeflateResponse):
+                return PerMessageDeflateResponseAccept(response)
+
+        self.setProtocolOptions(perMessageCompressionAccept=accept)
+
+    def _open_connection(self):
+        # Scheduled onto the loop thread, where there is a running loop.
+        asyncio.ensure_future(self._connect_async())
+
+    async def _connect_async(self):
+        loop = self.manager.loop
+        if loop is None or loop.is_closed():
+            return
+
+        ssl = None
+        if self.isSecure:
+            import ssl as ssl_module
+
+            ssl = ssl_module.create_default_context()
+
+        try:
+            LOGGER.debug("Connecting to %s...", self.url)
+            # The factory itself is the (callable) protocol factory expected by
+            # ``create_connection``; autobahn drives the WebSocket handshake
+            # from the protocol's ``connection_made``.
+            await loop.create_connection(self, self.host, self.port, ssl=ssl)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:  # noqa: BLE001 — any connect error triggers a retry
+            LOGGER.debug("Connection attempt failed: %s", exc)
+            self._schedule_reconnect()
+
+    def _schedule_reconnect(self):
+        """Schedule the next reconnect attempt with jittered exponential backoff.
+
+        Always invoked from the loop thread, so it can use ``call_later``
+        directly rather than ``call_soon_threadsafe``.
+        """
+        if self._stop:
+            return
+
+        self._retry_count += 1
+        if self.maxRetries is not None and self._retry_count > self.maxRetries:
+            LOGGER.warning("Exceeded max reconnect retries (%s); giving up.", self.maxRetries)
+            return
+
+        delay = self._reconnect_delay
+        jittered = delay + (random.random() * 2 - 1) * delay * self.jitter
+        sleep_for = max(0.0, min(jittered, self.maxDelay))
+        # Advance the backoff for the following attempt.
+        self._reconnect_delay = min(delay * self.factor, self.maxDelay)
+
+        LOGGER.debug("Will retry connection in %.2fs (attempt %d).", sleep_for, self._retry_count)
+        loop = self.manager.loop
+        if loop is None or loop.is_closed():
+            return
+        loop.call_later(sleep_for, self._open_connection)
 
 
 class AsyncioEventLoopManager(object):

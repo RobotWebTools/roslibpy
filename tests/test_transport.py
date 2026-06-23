@@ -1,3 +1,4 @@
+import os
 import sys
 
 import pytest
@@ -11,6 +12,13 @@ from roslibpy.comm import (
 )
 
 PLATFORM_DEFAULT = TRANSPORT_CLI if sys.platform == "cli" else TRANSPORT_TWISTED
+
+# The transport this process is dedicated to. Autobahn's txaio binds a single
+# async framework per process, so importing ``comm_asyncio`` (which loads
+# ``autobahn.asyncio``) must be avoided unless this is the asyncio process —
+# otherwise it would poison a twisted-designated process. CI runs the suite
+# once per transport.
+ACTIVE_TRANSPORT = TRANSPORT_CLI if sys.platform == "cli" else os.environ.get("ROSLIBPY_TRANSPORT", TRANSPORT_TWISTED)
 
 
 @pytest.fixture(autouse=True)
@@ -68,27 +76,61 @@ def test_ros_passes_explicit_transport_to_factory_selector(monkeypatch):
     assert selected == [TRANSPORT_ASYNCIO]
 
 
+def _import_asyncio_protocol():
+    """Import the asyncio protocol, skipping unless this process is dedicated to
+    the asyncio transport.
+
+    Importing ``comm_asyncio`` loads ``autobahn.asyncio`` and locks this
+    process's txaio framework to asyncio, so we must not do it in a
+    twisted-designated process."""
+    if ACTIVE_TRANSPORT != TRANSPORT_ASYNCIO:
+        pytest.skip("asyncio protocol tests run only when ROSLIBPY_TRANSPORT=asyncio")
+    try:
+        from roslibpy.comm.comm_asyncio import AsyncioRosBridgeProtocol
+    except (ImportError, RuntimeError) as exc:
+        pytest.skip("asyncio transport unavailable in this process: %s" % exc)
+    return AsyncioRosBridgeProtocol
+
+
 def test_asyncio_protocol_sends_text_frames():
-    asyncio = pytest.importorskip("asyncio")
+    AsyncioRosBridgeProtocol = _import_asyncio_protocol()
 
-    from roslibpy.comm.comm_asyncio import AsyncioRosBridgeProtocol
+    # Build the protocol without going through autobahn's connection setup; we
+    # only exercise the ROS-bridge send path here.
+    protocol = AsyncioRosBridgeProtocol.__new__(AsyncioRosBridgeProtocol)
 
-    class WebSocket(object):
-        def __init__(self):
-            self.payload = None
+    sent = []
+    protocol.sendMessage = lambda payload, isBinary=False: sent.append((payload, isBinary))
 
-        async def send(self, payload):
-            self.payload = payload
+    protocol._send(b'{"op": "call_service"}')
 
-    async def run_test():
-        websocket = WebSocket()
-        protocol = AsyncioRosBridgeProtocol(object(), websocket)
+    assert sent == [(b'{"op": "call_service"}', False)]
 
-        await protocol._send_async(b'{"op": "call_service"}')
-        protocol._stop_sender()
-        return websocket.payload
 
-    payload = asyncio.run(run_test())
+def test_asyncio_protocol_send_message_is_thread_safe():
+    AsyncioRosBridgeProtocol = _import_asyncio_protocol()
 
-    assert payload == '{"op": "call_service"}'
-    assert isinstance(payload, str)
+    scheduled = []
+
+    class FakeLoop(object):
+        def is_closed(self):
+            return False
+
+        def call_soon_threadsafe(self, fn, *args):
+            scheduled.append((fn, args))
+
+    class FakeManager(object):
+        loop = FakeLoop()
+
+    class FakeFactory(object):
+        manager = FakeManager()
+
+    protocol = AsyncioRosBridgeProtocol.__new__(AsyncioRosBridgeProtocol)
+    protocol.factory = FakeFactory()
+
+    protocol.send_message(b'{"op": "call_service"}')
+
+    assert len(scheduled) == 1
+    fn, args = scheduled[0]
+    assert fn == protocol._send
+    assert args == (b'{"op": "call_service"}',)

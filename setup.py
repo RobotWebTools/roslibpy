@@ -66,6 +66,6 @@ setup(
     ],
     keywords=["ros", "ros-bridge", "robotics", "websockets"],
     install_requires=requirements,
-    extras_require={"asyncio": ["websockets>=12.0"]},
+    extras_require={},
     entry_points={"console_scripts": ["roslibpy=roslibpy.__main__:main"]},
 )

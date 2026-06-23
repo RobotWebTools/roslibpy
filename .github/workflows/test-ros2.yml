@@ -55,9 +55,15 @@ jobs:
       - name: Run linter
         run: |
           invoke check
-      - name: Run tests
+      # The twisted and asyncio transports both build on Autobahn, whose txaio
+      # layer binds a single async framework per process, so each transport is
+      # exercised in its own pytest process.
+      - name: Run tests (twisted transport)
         run: |
-          pytest tests/ros2
+          ROSLIBPY_TRANSPORT=twisted pytest tests/ros2
+      - name: Run tests (asyncio transport)
+        run: |
+          ROSLIBPY_TRANSPORT=asyncio pytest tests/ros2
       - name: Tear down docker containers
         run: |
           docker rm -f rosbridge
