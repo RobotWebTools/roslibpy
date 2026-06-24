@@ -27,7 +27,17 @@ import tempfile
 import threading
 import time
 
-from roslibpy import Message, Ros, Topic
+from roslibpy import Message, Ros, Service, ServiceRequest, Topic
+
+
+def service_ping(ros):
+    """Distro-agnostic rosapi round-trip used to measure service latency.
+
+    Calls ``/rosapi/get_time`` but, unlike ``Ros.get_time()``, does not parse
+    the response (whose shape differs between ROS 1 ``secs``/``nsecs`` and ROS 2
+    ``sec``/``nanosec``), so the benchmark runs unchanged against either."""
+    service = Service(ros, "/rosapi/get_time", "rosapi/GetTime")
+    return service.call(ServiceRequest(), timeout=5)
 
 
 CASES = {
@@ -115,7 +125,7 @@ def wait_rosbridge_ready(transport, args):
             ros = Ros(args.host, args.port, transport=transport)
             ros.run()
             wait_connected(ros, args.connect_timeout)
-            ros.get_time()
+            service_ping(ros)
             return
         except Exception as error:
             last_error = error
@@ -133,11 +143,11 @@ def wait_rosbridge_ready(transport, args):
 
 def service_latency(ros, count, warmup):
     for _ in range(warmup):
-        ros.get_time()
+        service_ping(ros)
     timings = []
     for _ in range(count):
         start = time.perf_counter()
-        ros.get_time()
+        service_ping(ros)
         timings.append(time.perf_counter() - start)
     return timings
 
