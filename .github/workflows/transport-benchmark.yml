@@ -40,8 +40,9 @@ jobs:
             --host 127.0.0.1 \
             --port 9090 \
             --cases twisted asyncio asyncio-uvloop asyncio-no-compression asyncio-uvloop-no-compression \
-            --service-count 300 \
-            --topic-count 500 \
+            --warmup 100 \
+            --service-count 1500 \
+            --topic-count 3000 \
             --markdown transport-benchmark.md
           cat transport-benchmark.md >> "$GITHUB_STEP_SUMMARY"
       - name: Upload transport benchmark

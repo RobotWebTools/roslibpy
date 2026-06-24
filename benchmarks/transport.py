@@ -75,8 +75,9 @@ def summary(values):
 
 def format_summary_line(transport, label, values):
     data = summary(values)
-    return "{:<30} {:<16} mean={mean:7.3f} ms median={median:7.3f} ms " "p95={p95:7.3f} ms max={max:7.3f} ms".format(
-        transport, label, **data
+    return (
+        "{:<30} {:<16} mean={mean:7.3f} ms median={median:7.3f} ms "
+        "p95={p95:7.3f} ms max={max:7.3f} ms".format(transport, label, **data)
     )
 
 
@@ -87,8 +88,11 @@ def print_summary(transport, label, values):
 def markdown_row(transport, metric, values=None, value=None):
     if values is not None:
         data = summary(values)
-        return "| {transport} | {metric} | {mean:.3f} ms | {median:.3f} ms | " "{p95:.3f} ms | {max:.3f} ms | |".format(
-            transport=transport, metric=metric, **data
+        return (
+            "| {transport} | {metric} | {mean:.3f} ms | {median:.3f} ms | "
+            "{p95:.3f} ms | {max:.3f} ms | |".format(
+                transport=transport, metric=metric, **data
+            )
         )
     return "| {} | {} | | | | | {} |".format(transport, metric, value)
 
@@ -122,7 +126,9 @@ def wait_rosbridge_ready(transport, args):
                     ros.close()
                 except Exception:
                     pass
-    raise RuntimeError("Timed out waiting for rosbridge readiness: {}".format(last_error))
+    raise RuntimeError(
+        "Timed out waiting for rosbridge readiness: {}".format(last_error)
+    )
 
 
 def service_latency(ros, count, warmup):
@@ -168,7 +174,9 @@ def topic_latency(ros, case_name, count, warmup, delay):
             time.sleep(delay)
 
     if not done.wait(15):
-        raise RuntimeError("Timed out after receiving {} of {} messages".format(len(timings), count))
+        raise RuntimeError(
+            "Timed out after receiving {} of {} messages".format(len(timings), count)
+        )
 
     total = time.perf_counter() - start_total
     listener.unsubscribe()
@@ -204,9 +212,15 @@ def run_case(case_name, args):
     connect_time = time.perf_counter() - start
 
     services = service_latency(ros, args.service_count, args.warmup)
-    topics, topic_rate = topic_latency(ros, case_name, args.topic_count, args.warmup, args.topic_delay)
+    topics, topic_rate = topic_latency(
+        ros, case_name, args.topic_count, args.warmup, args.topic_delay
+    )
 
-    print("{:<30} {:<16} {:7.3f} ms".format(case_name, "initial connect", connect_time * 1000.0))
+    print(
+        "{:<30} {:<16} {:7.3f} ms".format(
+            case_name, "initial connect", connect_time * 1000.0
+        )
+    )
     print_summary(case_name, "get_time", services)
     print_summary(case_name, "topic rtt", topics)
     print("{:<30} {:<16} {:7.1f} msg/s".format(case_name, "topic rate", topic_rate))
@@ -278,7 +292,13 @@ def write_markdown(path, results):
         lines.append(markdown_row(transport, "initial connect", result["connect"]))
         lines.append(markdown_row(transport, "get_time service", result["services"]))
         lines.append(markdown_row(transport, "topic round trip", result["topics"]))
-        lines.append(markdown_row(transport, "topic throughput", value="{:.1f} msg/s".format(result["topic_rate"])))
+        lines.append(
+            markdown_row(
+                transport,
+                "topic throughput",
+                value="{:.1f} msg/s".format(result["topic_rate"]),
+            )
+        )
     lines.append("")
     with open(path, "w") as fh:
         fh.write("\n".join(lines))
@@ -295,11 +315,13 @@ def main():
     parser.add_argument("--service-count", type=int, default=1000)
     parser.add_argument("--topic-count", type=int, default=1000)
     parser.add_argument("--warmup", type=int, default=50)
-    parser.add_argument("--topic-delay", type=float, default=0.0005)
+    parser.add_argument("--topic-delay", type=float, default=0.00005)
     parser.add_argument("--connect-timeout", type=float, default=5.0)
     parser.add_argument("--ready-timeout", type=float, default=30.0)
     parser.add_argument("--ready-interval", type=float, default=0.5)
-    parser.add_argument("--markdown", help="Write a Markdown summary table to this path")
+    parser.add_argument(
+        "--markdown", help="Write a Markdown summary table to this path"
+    )
     args = parser.parse_args()
 
     if args.case:
@@ -314,7 +336,11 @@ def main():
     results = []
     for case_name in cases:
         if case_name not in CASES:
-            raise ValueError("Unknown benchmark case {!r}; expected one of {}".format(case_name, sorted(CASES)))
+            raise ValueError(
+                "Unknown benchmark case {!r}; expected one of {}".format(
+                    case_name, sorted(CASES)
+                )
+            )
         results.append((case_name, run_case_subprocess(case_name, args)))
 
     if args.markdown:
