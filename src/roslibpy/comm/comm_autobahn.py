@@ -71,6 +71,16 @@ class AutobahnRosBridgeClientFactory(EventEmitterMixin, ReconnectingClientFactor
 
     def connect(self):
         """Establish WebSocket connection to the ROS server defined for this factory."""
+        # Route the connection setup through the reactor thread. Calling
+        # ``connectWS`` directly only happens to work while the reactor is busy;
+        # once it is idle (e.g. more than ``closeHandshakeTimeout`` seconds after
+        # a previous disconnect) it sits blocked in ``select()`` and never
+        # notices a connector added from another thread, so the connection times
+        # out. ``callFromThread`` wakes it, and is also safe before the reactor
+        # has started (the call is queued and runs once it does).
+        reactor.callFromThread(self._connect)
+
+    def _connect(self):
         self.connector = connectWS(self)
 
     @property
