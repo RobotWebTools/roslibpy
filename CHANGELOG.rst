@@ -16,6 +16,19 @@ Unreleased
 
 **Fixed**
 
+**Deprecated**
+
+**Removed**
+
+2.0.1
+----------
+
+**Added**
+
+**Changed**
+
+**Fixed**
+
 * Fixed reconnection on the Twisted transport failing after a connection had
   been idle for more than a few seconds: ``connect`` now schedules the
   connection through the reactor thread so an idle reactor is woken to service
