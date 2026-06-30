@@ -12,6 +12,19 @@ Unreleased
 
 **Added**
 
+**Changed**
+
+**Fixed**
+
+**Deprecated**
+
+**Removed**
+
+2.1.0
+----------
+
+**Added**
+
 * Added an asyncio transport backend (Autobahn running on an asyncio event
   loop instead of the Twisted reactor) selectable with ``ROSLIBPY_TRANSPORT``,
   ``set_default_transport()``, or the ``Ros(..., transport=...)`` argument.

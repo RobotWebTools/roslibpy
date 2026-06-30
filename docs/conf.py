@@ -25,7 +25,7 @@ project = "roslibpy"
 year = "2019"
 author = "Gramazio Kohler Research"
 copyright = "{0}, {1}".format(year, author)
-version = release = "2.0.1"
+version = release = "2.1.0"
 
 pygments_style = "trac"  # Perhaps change to sphinx
 templates_path = ["."]
