@@ -1,0 +1,59 @@
+name: Transport benchmark
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  transport-benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install wheel
+      - name: Install
+        run: |
+          python -m pip install --no-cache-dir -r requirements-dev.txt
+          python -m pip install --no-cache-dir uvloop
+      - name: Set up docker containers
+        run: |
+          docker build -t gramaziokohler/rosbridge:integration_tests_ros1 ./docker/ros1
+          docker run -d -p 9090:9090 --name rosbridge gramaziokohler/rosbridge:integration_tests_ros1 /bin/bash -c "roslaunch /integration-tests.launch"
+          docker ps -a
+      - name: Run transport benchmark
+        continue-on-error: true
+        run: |
+          python benchmarks/transport.py \
+            --host 127.0.0.1 \
+            --port 9090 \
+            --cases twisted asyncio asyncio-uvloop asyncio-no-compression asyncio-uvloop-no-compression \
+            --warmup 100 \
+            --service-count 1500 \
+            --topic-count 3000 \
+            --markdown transport-benchmark.md
+          cat transport-benchmark.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload transport benchmark
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: transport-benchmark
+          path: transport-benchmark.md
+          if-no-files-found: ignore
+      - name: Tear down docker containers
+        if: always()
+        run: |
+          docker rm -f rosbridge

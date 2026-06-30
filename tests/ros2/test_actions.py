@@ -5,8 +5,8 @@ import time
 from roslibpy import ActionClient, Goal, GoalStatus, Ros
 
 
-def test_fibonacci():
-    ros = Ros("127.0.0.1", 9090)
+def test_fibonacci(ros_transport):
+    ros = Ros("127.0.0.1", 9090, transport=ros_transport)
     ros.run()
 
     action = ActionClient(ros, "/fibonacci", "example_interfaces/action/Fibonacci")
@@ -34,8 +34,8 @@ def test_fibonacci():
     ros.close()
 
 
-def test_cancel():
-    ros = Ros("127.0.0.1", 9090)
+def test_cancel(ros_transport):
+    ros = Ros("127.0.0.1", 9090, transport=ros_transport)
     ros.run()
 
     action = ActionClient(ros, "/fibonacci", "example_interfaces/action/Fibonacci")

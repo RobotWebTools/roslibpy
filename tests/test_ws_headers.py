@@ -1,17 +1,14 @@
-from __future__ import print_function
-
-import asyncio
 import threading
 import time
 
-import websockets
+import pytest
 
 from roslibpy import Ros
 
-headers = {
-    'cookie': 'token=rosbridge',
-    'authorization': 'Some auth'
-}
+asyncio = pytest.importorskip("asyncio")
+websockets = pytest.importorskip("websockets")
+
+headers = {"cookie": "token=rosbridge", "authorization": "Some auth"}
 
 
 async def websocket_handler(websocket, path):
@@ -22,7 +19,7 @@ async def websocket_handler(websocket, path):
 
 
 async def start_server(stop_event):
-    server = await websockets.serve(websocket_handler, '127.0.0.1', 9000)
+    server = await websockets.serve(websocket_handler, "127.0.0.1", 9000)
     await stop_event.wait()
     server.close()
     await server.wait_closed()
@@ -32,13 +29,13 @@ def run_server(stop_event):
     asyncio.run(start_server(stop_event))
 
 
-def run_client():
-    client = Ros('127.0.0.1', 9000, headers=headers)
+def run_client(ros_transport):
+    client = Ros("127.0.0.1", 9000, headers=headers, transport=ros_transport)
     client.run()
     client.close()
 
 
-def test_websocket_headers():
+def test_websocket_headers(ros_transport):
     server_stop_event = asyncio.Event()
     stop_event = threading.Event()
 
@@ -47,7 +44,7 @@ def test_websocket_headers():
 
     time.sleep(1)  # Give the server time to start
 
-    client_thread = threading.Thread(target=run_client)
+    client_thread = threading.Thread(target=run_client, args=(ros_transport,))
     client_thread.start()
 
     # Wait for the client thread to finish or timeout after 10 seconds

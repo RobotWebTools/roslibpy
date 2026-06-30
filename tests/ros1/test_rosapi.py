@@ -9,9 +9,9 @@ port = 9090
 url = "ws://%s:%d" % (host, port)
 
 
-def test_rosapi_topics():
+def test_rosapi_topics(ros_transport):
     context = dict(wait=threading.Event(), result=None)
-    ros = Ros(host, port)
+    ros = Ros(host, port, transport=ros_transport)
     ros.run()
 
     def callback(topic_list):
@@ -26,8 +26,8 @@ def test_rosapi_topics():
     ros.close()
 
 
-def test_rosapi_topics_blocking():
-    ros = Ros(host, port)
+def test_rosapi_topics_blocking(ros_transport):
+    ros = Ros(host, port, transport=ros_transport)
     ros.run()
     topic_list = ros.get_topics()
 
@@ -37,11 +37,11 @@ def test_rosapi_topics_blocking():
     ros.close()
 
 
-def test_connection_fails_when_missing_port():
+def test_connection_fails_when_missing_port(ros_transport):
     with pytest.raises(Exception):
-        Ros(host)
+        Ros(host, transport=ros_transport)
 
 
-def test_connection_fails_when_schema_not_ws():
+def test_connection_fails_when_schema_not_ws(ros_transport):
     with pytest.raises(Exception):
-        Ros("http://%s:%d" % (host, port))
+        Ros("http://%s:%d" % (host, port), transport=ros_transport)

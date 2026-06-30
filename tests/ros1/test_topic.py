@@ -6,10 +6,10 @@ import time
 from roslibpy import Header, Message, Ros, Time, Topic
 
 
-def test_topic_pubsub():
+def test_topic_pubsub(ros_transport):
     context = dict(wait=threading.Event(), counter=0)
 
-    ros = Ros("127.0.0.1", 9090)
+    ros = Ros("127.0.0.1", 9090, transport=ros_transport)
     ros.run()
 
     listener = Topic(ros, "/chatter", "std_msgs/String")
@@ -50,10 +50,10 @@ def test_topic_pubsub():
     ros.close()
 
 
-def test_topic_with_header():
+def test_topic_with_header(ros_transport):
     context = dict(wait=threading.Event())
 
-    ros = Ros("127.0.0.1", 9090)
+    ros = Ros("127.0.0.1", 9090, transport=ros_transport)
     ros.run()
 
     listener = Topic(ros, "/points", "geometry_msgs/PointStamped")

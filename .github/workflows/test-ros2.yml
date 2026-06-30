@@ -20,6 +20,8 @@ jobs:
           "ubuntu-py310",
           "ubuntu-py311",
           "ubuntu-py312",
+          "ubuntu-py313",
+          "ubuntu-py314",
         ]
         include:
           - name: "ubuntu-py39"
@@ -34,6 +36,12 @@ jobs:
           - name: "ubuntu-py312"
             os: ubuntu-latest
             python-version: "3.12"
+          - name: "ubuntu-py313"
+            os: ubuntu-latest
+            python-version: "3.13"
+          - name: "ubuntu-py314"
+            os: ubuntu-latest
+            python-version: "3.14"
     steps:
       - uses: actions/checkout@v7
       - name: Set up Python ${{ matrix.python-version }}
@@ -55,9 +63,15 @@ jobs:
       - name: Run linter
         run: |
           invoke check
-      - name: Run tests
+      # The twisted and asyncio transports both build on Autobahn, whose txaio
+      # layer binds a single async framework per process, so each transport is
+      # exercised in its own pytest process.
+      - name: Run tests (twisted transport)
         run: |
-          pytest tests/ros2
+          ROSLIBPY_TRANSPORT=twisted pytest tests/ros2
+      - name: Run tests (asyncio transport)
+        run: |
+          ROSLIBPY_TRANSPORT=asyncio pytest tests/ros2
       - name: Tear down docker containers
         run: |
           docker rm -f rosbridge

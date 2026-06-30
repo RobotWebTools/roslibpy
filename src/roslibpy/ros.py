@@ -4,7 +4,7 @@ import logging
 import threading
 
 from . import Message, Param, Service, ServiceRequest, Time
-from .comm import RosBridgeClientFactory
+from .comm import select_factory
 from .core import RosTimeoutError
 
 __all__ = ["Ros", "set_rosapi_timeout"]
@@ -35,10 +35,25 @@ class Ros(object):
         headers (:obj:`dict`): Additional headers to include in the WebSocket connection.
     """
 
-    def __init__(self, host, port=None, is_secure=False, headers=None):
+    def __init__(self, host, port=None, is_secure=False, headers=None, transport=None):
+        """Create a new connection manager.
+
+        Args:
+            host (:obj:`str`): Name or IP address of the ROS bridge host, e.g. ``127.0.0.1``.
+            port (:obj:`int`): ROS bridge port, e.g. ``9090``.
+            is_secure (:obj:`bool`): ``True`` to use a secure web sockets connection.
+            headers (:obj:`dict`): Additional headers to include in the WebSocket connection.
+            transport (:obj:`str`, optional): Transport backend to use. One of
+                ``"twisted"``, ``"asyncio"``, ``"cli"``. If ``None`` (default),
+                resolves via the ``ROSLIBPY_TRANSPORT`` env var,
+                :func:`roslibpy.set_default_transport`, or the platform default
+                (``cli`` on IronPython, ``twisted`` elsewhere). See
+                ``roslibpy.comm.__init__`` for the full precedence rules.
+        """
         self._id_counter = 0
-        url = RosBridgeClientFactory.create_url(host, port, is_secure)
-        self.factory = RosBridgeClientFactory(url, headers=headers)
+        factory_cls = select_factory(transport)
+        url = factory_cls.create_url(host, port, is_secure)
+        self.factory = factory_cls(url, headers=headers)
         self.is_connecting = False
         self.connect()
 
