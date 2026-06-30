@@ -20,6 +20,8 @@ Unreleased
 
 **Changed**
 
+* Updated the package classifiers to 3.9-3.14 (removes most EOL python versions, 3.9 is still supported).
+
 **Fixed**
 
 **Deprecated**

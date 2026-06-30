@@ -20,6 +20,8 @@ jobs:
           "ubuntu-py310",
           "ubuntu-py311",
           "ubuntu-py312",
+          "ubuntu-py313",
+          "ubuntu-py314",
         ]
         include:
           - name: "ubuntu-py39"
@@ -34,6 +36,12 @@ jobs:
           - name: "ubuntu-py312"
             os: ubuntu-latest
             python-version: "3.12"
+          - name: "ubuntu-py313"
+            os: ubuntu-latest
+            python-version: "3.13"
+          - name: "ubuntu-py314"
+            os: ubuntu-latest
+            python-version: "3.14"
     steps:
       - uses: actions/checkout@v7
       - name: Set up Python ${{ matrix.python-version }}
