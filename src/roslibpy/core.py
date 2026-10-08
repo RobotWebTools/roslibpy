@@ -230,6 +230,7 @@ class Topic(object):
 
         self._subscribe_id = None
         self._advertise_id = None
+        self._connect_messages = {}
 
         if self.compression is None:
             self.compression = "none"
@@ -294,7 +295,9 @@ class Topic(object):
 
         # Do not try to reconnect when manually unsubscribing
         if self.reconnect_on_close:
-            self.ros.off("close", self._reconnect_topic)
+            self._connect_messages.pop("subscribe", None)
+            if not self._connect_messages:
+                self.ros.off("close", self._reconnect_topic)
 
         self.ros.off(self.name)
         self.ros.send_on_ready(Message({"op": "unsubscribe", "id": self._subscribe_id, "topic": self.name}))
@@ -348,17 +351,21 @@ class Topic(object):
         self._advertise_id = None
 
     def _connect_topic(self, message):
-        self._connect_message = message
-        self.ros.send_on_ready(message)
-
         if self.reconnect_on_close:
-            self.ros.on("close", self._reconnect_topic)
+            if not self._connect_messages:
+                self.ros.on("close", self._reconnect_topic)
+            self._connect_messages[message["op"]] = message
+        self.ros.send_on_ready(message)
 
     def _reconnect_topic(self, _proto):
         # Delay a bit the event hookup because
         #  1) _proto is not yet nullified, and
         #  2) reconnect anyway takes a few seconds
-        self.ros.call_later(1, lambda: self.ros.send_on_ready(self._connect_message))
+        def reconnect():
+            for message in list(self._connect_messages.values()):
+                self.ros.send_on_ready(message)
+
+        self.ros.call_later(1, reconnect)
 
     def unadvertise(self):
         """Unregister as a publisher for the topic."""
@@ -367,7 +374,9 @@ class Topic(object):
 
         # Do not try to reconnect when manually unadvertising
         if self.reconnect_on_close:
-            self.ros.off("close", self._reconnect_topic)
+            self._connect_messages.pop("advertise", None)
+            if not self._connect_messages:
+                self.ros.off("close", self._reconnect_topic)
 
         self.ros.send_on_ready(
             Message(
