@@ -14,6 +14,9 @@ Unreleased
 
 **Changed**
 
+* The release workflow now also creates the GitHub Release for each version tag,
+  with notes taken from this changelog and the built packages attached.
+
 **Fixed**
 
 **Deprecated**
