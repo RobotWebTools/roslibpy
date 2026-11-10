@@ -4,6 +4,7 @@ from __future__ import print_function
 import contextlib
 import glob
 import os
+import re
 import sys
 from shutil import rmtree
 
@@ -155,6 +156,78 @@ def prepare_changelog(ctx):
             changelog.write(content[0:start_index] + UNRELEASED_CHANGELOG_TEMPLATE + content[start_index:])
 
         ctx.run('git add CHANGELOG.rst && git commit -m "Prepare changelog for next release"')
+
+
+def changelog_to_markdown(changelog, version):
+    """Convert the section of ``version`` in the CHANGELOG.rst text to GitHub Markdown.
+
+    ``**Group**`` lines become ``## Group`` headings (empty groups are skipped),
+    wrapped bullet lines are joined and ``code`` spans use single backticks.
+
+    Raises ``ValueError`` if the section is missing, has no entries, or contains
+    a line that cannot be converted, instead of silently dropping content.
+    """
+    lines = changelog.splitlines()
+
+    def is_underline(line):
+        return re.match(r'-{3,}$', line) is not None
+
+    # Collect the lines of the "<version>" section (heading underlined with dashes)
+    section, found, inside = [], False, False
+    for i, line in enumerate(lines):
+        if i + 1 < len(lines) and is_underline(lines[i + 1]):
+            if inside:
+                break
+            inside = line.strip() == version
+            found = found or inside
+            continue
+        if inside and not is_underline(line):
+            section.append((i + 1, line))
+    if not found:
+        raise ValueError('No section for {} in CHANGELOG.rst'.format(version))
+
+    groups, current = [], None
+    for lineno, line in section:
+        if not line.strip():
+            continue
+        group = re.match(r'\*\*(.+)\*\*$', line.strip())
+        if group:
+            current = (group.group(1), [])
+            groups.append(current)
+        elif current is not None and re.match(r' *[*-] ', line):
+            # Nested bullets keep their indentation, so Markdown nests them too
+            current[1].append(line.rstrip())
+        elif current is not None and current[1] and line.startswith(' '):
+            current[1][-1] += ' ' + line.strip()
+        else:
+            raise ValueError('CHANGELOG.rst line {}: cannot convert {!r} to release notes; '
+                             'expected a **Group** line, a bullet or an indented continuation'.format(lineno, line))
+
+    out = []
+    for title, items in groups:
+        if items:
+            out += ['## ' + title, ''] + [item.replace('``', '`') for item in items] + ['']
+    if not out:
+        raise ValueError('The {} section of CHANGELOG.rst has no entries'.format(version))
+    return '\n'.join(out)
+
+
+@task(help={
+      'tag': 'Version (tag) to get the notes for, e.g. v2.1.0 or 2.1.0.',
+      'output': 'File to also write the notes to.'})
+def release_notes(ctx, tag, output=None):
+    """Prints the GitHub release notes of a version, taken from CHANGELOG.rst."""
+    version = tag[1:] if tag.startswith('v') else tag
+    with open(os.path.join(BASE_FOLDER, 'CHANGELOG.rst'), encoding='utf-8') as changelog:
+        try:
+            notes = changelog_to_markdown(changelog.read(), version)
+        except ValueError as e:
+            raise Exit(str(e))
+
+    if output:
+        with open(output, 'w', encoding='utf-8') as f:
+            f.write(notes)
+    print(notes)
 
 
 @task(help={

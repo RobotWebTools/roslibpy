@@ -40,6 +40,13 @@ jobs:
       - name: 💎 Install
         run: |
           python -m pip install --no-cache-dir -r requirements-dev.txt
+      - name: 📝 Extract release notes from changelog
+        # Before building and publishing, so a missing or malformed changelog
+        # section fails the release before anything is uploaded to PyPI
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          invoke release-notes --tag "$TAG" --output release-notes.md
       - name: 💃 Build release
         run: |
           python setup.py clean --all sdist bdist_wheel
@@ -47,51 +54,6 @@ jobs:
         uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
         with:
             password: ${{ secrets.pypi_password }}
-      - name: 📝 Extract release notes from changelog
-        env:
-          VERSION: ${{ github.ref_name }}
-        run: |
-          python - <<'PY'
-          import os
-          import re
-
-          version = os.environ["VERSION"].lstrip("v")
-          lines = open("CHANGELOG.rst", encoding="utf-8").read().splitlines()
-
-          # Collect the lines of the "<version>" section (heading underlined with dashes)
-          section, inside = [], False
-          for i, line in enumerate(lines):
-              is_heading = i + 1 < len(lines) and re.fullmatch(r"-{3,}", lines[i + 1])
-              if is_heading:
-                  if inside:
-                      break
-                  inside = line.strip() == version
-                  continue
-              if inside and not re.fullmatch(r"-{3,}", line):
-                  section.append(line)
-          if not section:
-              raise SystemExit(f"No section for {version} in CHANGELOG.rst")
-
-          # Convert to Markdown: **Group** -> ## Group (skipping empty groups),
-          # join wrapped bullet lines, ``code`` -> `code`
-          groups, current = [], None
-          for line in section:
-              m = re.fullmatch(r"\*\*(.+)\*\*", line.strip())
-              if m:
-                  current = (m.group(1), [])
-                  groups.append(current)
-              elif current and line.startswith("* "):
-                  current[1].append(line)
-              elif current and current[1] and line.startswith("  ") and line.strip():
-                  current[1][-1] += " " + line.strip()
-
-          out = []
-          for title, items in groups:
-              if items:
-                  out += [f"## {title}", ""] + [i.replace("``", "`") for i in items] + [""]
-          open("release-notes.md", "w", encoding="utf-8").write("\n".join(out))
-          print("\n".join(out))
-          PY
       - name: 🚀 Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
