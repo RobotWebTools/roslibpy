@@ -12,7 +12,13 @@ Unreleased
 
 **Added**
 
+* Added ``invoke release-notes`` task to preview the GitHub Release notes generated
+  from this changelog.
+
 **Changed**
+
+* The release workflow now also creates the GitHub Release for each version tag,
+  with notes taken from this changelog and the built packages attached.
 
 **Fixed**
 

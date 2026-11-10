@@ -9,6 +9,8 @@ jobs:
   publish-release:
     name: publish release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # create the GitHub Release
     steps:
       - uses: actions/checkout@v7
         with:
@@ -38,6 +40,13 @@ jobs:
       - name: 💎 Install
         run: |
           python -m pip install --no-cache-dir -r requirements-dev.txt
+      - name: 📝 Extract release notes from changelog
+        # Before building and publishing, so a missing or malformed changelog
+        # section fails the release before anything is uploaded to PyPI
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          invoke release-notes --tag "$TAG" --output release-notes.md
       - name: 💃 Build release
         run: |
           python setup.py clean --all sdist bdist_wheel
@@ -45,3 +54,12 @@ jobs:
         uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
         with:
             password: ${{ secrets.pypi_password }}
+      - name: 🚀 Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" dist/* \
+            --verify-tag \
+            --title "roslibpy ${{ github.ref_name }}" \
+            --notes-file release-notes.md \
+            --generate-notes
